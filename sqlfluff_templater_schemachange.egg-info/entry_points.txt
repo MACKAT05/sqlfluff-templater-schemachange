@@ -1,0 +1,2 @@
+[sqlfluff]
+sqlfluff_templater_schemachange = sqlfluff_templater_schemachange

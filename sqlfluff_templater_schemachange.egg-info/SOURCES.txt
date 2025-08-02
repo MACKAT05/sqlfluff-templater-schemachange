@@ -1,0 +1,10 @@
+README.md
+setup.py
+sqlfluff_templater_schemachange/__init__.py
+sqlfluff_templater_schemachange/templater.py
+sqlfluff_templater_schemachange.egg-info/PKG-INFO
+sqlfluff_templater_schemachange.egg-info/SOURCES.txt
+sqlfluff_templater_schemachange.egg-info/dependency_links.txt
+sqlfluff_templater_schemachange.egg-info/entry_points.txt
+sqlfluff_templater_schemachange.egg-info/requires.txt
+sqlfluff_templater_schemachange.egg-info/top_level.txt

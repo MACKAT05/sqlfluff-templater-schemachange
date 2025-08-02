@@ -1,0 +1,10 @@
+[sqlfluff]
+dialect = snowflake
+templater = schemachange
+
+[sqlfluff:templater:schemachange]
+# Path to schemachange config file (optional)
+# config_file_path = schemachange-config.yml
+
+# Variables can be passed directly
+vars = {"database": "TEST_DB", "schema": "PUBLIC"}

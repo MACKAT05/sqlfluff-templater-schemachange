@@ -1,0 +1,389 @@
+# SQLFluff Templater for Schemachange
+
+A custom SQLFluff templater that integrates with [schemachange](https://github.com/Snowflake-Labs/schemachange), enabling seamless SQL linting for files that use schemachange's Jinja templating features.
+
+## Features
+
+- **Schemachange Config Integration**: Automatically reads variables from `schemachange-config.yml`
+- **Jinja2 Templating**: Full support for Jinja2 templates including macros, includes, and inheritance
+- **Variable Management**: Supports complex nested variables and environment variable substitution
+- **Secret Filtering**: Automatically filters sensitive variables from logs
+- **Modules Support**: Load common templates and macros from a modules folder
+- **dbt Compatibility**: Optional dbt-style builtin functions (`ref()`, `source()`, `var()`, etc.)
+- **Environment Variables**: Support for `env_var()` function in config files
+
+## Installation
+
+```bash
+pip install sqlfluff-templater-schemachange
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/yourusername/sqlfluff-templater-schemachange
+cd sqlfluff-templater-schemachange
+pip install -e .
+```
+
+## Configuration
+
+### Basic SQLFluff Configuration
+
+Create a `.sqlfluff` file in your project root:
+
+```ini
+[sqlfluff]
+templater = schemachange
+dialect = snowflake
+
+[sqlfluff:templater:schemachange]
+# Path to schemachange config file (optional, auto-discovered by default)
+config_file_path = schemachange-config.yml
+
+# Additional variables (merged with config file vars)
+vars = {"environment": "dev", "schema_suffix": "_DEV"}
+
+# Enable dbt-style builtin functions
+apply_dbt_builtins = true
+
+# Additional search paths for templates
+loader_search_path = templates,macros
+```
+
+### Schemachange Configuration
+
+Create a `schemachange-config.yml` file:
+
+```yaml
+config-version: 1
+
+# Basic schemachange settings
+root-folder: 'scripts'
+modules-folder: 'modules'
+
+# Database connection settings
+snowflake-account: '{{ env_var("SNOWFLAKE_ACCOUNT") }}'
+snowflake-user: '{{ env_var("SNOWFLAKE_USER") }}'
+snowflake-role: 'TRANSFORMER'
+snowflake-warehouse: 'COMPUTE_WH'
+snowflake-database: 'MY_DATABASE'
+
+# Variables for templating
+vars:
+  database_name: 'MY_DATABASE'
+  schema_name: 'ANALYTICS'
+  environment: 'production'
+  table_prefix: 'fact_'
+  
+  # Nested variables
+  sources:
+    raw_database: 'RAW_DATA'
+    staging_database: 'STAGING'
+  
+  # Secret variables (automatically filtered from logs)
+  secrets:
+    api_key: '{{ env_var("API_KEY") }}'
+    encryption_key: '{{ env_var("ENCRYPTION_KEY") }}'
+
+# Additional settings
+create-change-history-table: false
+autocommit: false
+verbose: true
+```
+
+## Usage Examples
+
+### Basic Variable Templating
+
+**SQL File** (`V1.0.1__create_tables.sql`):
+```sql
+-- Create tables with dynamic names
+CREATE TABLE {{ database_name }}.{{ schema_name }}.{{ table_prefix }}sales (
+    id INTEGER,
+    customer_id INTEGER,
+    amount DECIMAL(10,2),
+    created_at TIMESTAMP
+);
+
+CREATE TABLE {{ database_name }}.{{ schema_name }}.{{ table_prefix }}customers (
+    id INTEGER,
+    name VARCHAR(255),
+    email VARCHAR(255)
+);
+```
+
+### Using Nested Variables
+
+```sql
+-- Reference nested configuration
+CREATE SCHEMA IF NOT EXISTS {{ sources.staging_database }}.INTERMEDIATE;
+
+-- Copy data from raw to staging
+CREATE TABLE {{ sources.staging_database }}.INTERMEDIATE.cleaned_data AS
+SELECT * FROM {{ sources.raw_database }}.PUBLIC.raw_data
+WHERE created_at >= '{{ start_date }}';
+```
+
+### Environment Variable Integration
+
+```sql
+-- Use environment-specific settings
+USE WAREHOUSE {{ env_var('SNOWFLAKE_WAREHOUSE', 'DEFAULT_WH') }};
+
+-- Connect to environment-specific database  
+USE DATABASE {{ database_name }}_{{ environment | upper }};
+```
+
+### Using Jinja Macros
+
+**Macro file** (`modules/common_macros.sql`):
+```sql
+{% macro create_audit_columns() %}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) DEFAULT CURRENT_USER()
+{% endmacro %}
+
+{% macro generate_schema_name(custom_schema_name=none, node=none) %}
+    {% if custom_schema_name is none %}
+        {{ target.schema }}
+    {% else %}
+        {{ target.schema }}_{{ custom_schema_name | trim }}
+    {% endif %}
+{% endmacro %}
+```
+
+**SQL file using macros**:
+```sql
+CREATE TABLE {{ database_name }}.{{ generate_schema_name('analytics') }}.user_events (
+    event_id INTEGER,
+    user_id INTEGER,
+    event_type VARCHAR(50),
+    {{ create_audit_columns() }}
+);
+```
+
+### Using dbt-Style Functions
+
+When `apply_dbt_builtins = true`:
+
+```sql
+-- Use ref() function like in dbt
+SELECT * FROM {{ ref('staging_customers') }}
+WHERE status = 'active';
+
+-- Use source() function
+SELECT * FROM {{ source('raw_data', 'customer_events') }}
+WHERE event_date >= '{{ start_date }}';
+
+-- Use var() function with defaults
+SELECT * FROM events 
+WHERE event_type = '{{ var("event_filter", "click") }}';
+```
+
+### Conditional Logic
+
+```sql
+CREATE TABLE {{ database_name }}.{{ schema_name }}.events (
+    event_id INTEGER,
+    user_id INTEGER,
+    event_data JSON,
+    
+    {% if environment == 'production' %}
+    -- Only add PII columns in production
+    user_email VARCHAR(255),
+    user_phone VARCHAR(20),
+    {% endif %}
+    
+    created_at TIMESTAMP
+);
+
+{% if environment != 'production' %}
+-- Add test data in non-production environments
+INSERT INTO {{ database_name }}.{{ schema_name }}.events 
+VALUES (1, 100, '{"test": true}', CURRENT_TIMESTAMP);
+{% endif %}
+```
+
+### Template Inheritance
+
+**Base template** (`modules/base_table.sql`):
+```sql
+{% block table_definition %}
+CREATE TABLE {{ database_name }}.{{ schema_name }}.{{ table_name }} (
+    {% block columns %}{% endblock %}
+    {% block audit_columns %}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    {% endblock %}
+);
+{% endblock %}
+
+{% block post_create %}
+-- Default post-creation steps
+{% endblock %}
+```
+
+**Specific table** (`V1.0.2__create_products.sql`):
+```sql
+{% extends "base_table.sql" %}
+{% set table_name = "products" %}
+
+{% block columns %}
+    product_id INTEGER PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2),
+    category VARCHAR(100),
+{% endblock %}
+
+{% block post_create %}
+-- Add specific indexes
+CREATE INDEX idx_products_category ON {{ database_name }}.{{ schema_name }}.{{ table_name }} (category);
+{% endblock %}
+```
+
+## Running SQLFluff
+
+Once configured, run SQLFluff as usual:
+
+```bash
+# Lint all SQL files
+sqlfluff lint
+
+# Lint specific files
+sqlfluff lint scripts/versioned/
+
+# Fix auto-fixable issues
+sqlfluff fix
+
+# Check specific file with verbose output
+sqlfluff lint --verbose V1.0.1__create_tables.sql
+```
+
+## Advanced Configuration
+
+### Multiple Environment Support
+
+You can have different configurations for different environments:
+
+**.sqlfluff** (development):
+```ini
+[sqlfluff:templater:schemachange]
+config_file_path = configs/dev-config.yml
+vars = {"environment": "dev"}
+```
+
+**configs/dev-config.yml**:
+```yaml
+vars:
+  database_name: 'DEV_DATABASE'
+  environment: 'dev'
+  debug_mode: true
+```
+
+**configs/prod-config.yml**:
+```yaml
+vars:
+  database_name: 'PROD_DATABASE'  
+  environment: 'prod'
+  debug_mode: false
+```
+
+### Custom Search Paths
+
+```ini
+[sqlfluff:templater:schemachange]
+loader_search_path = templates,macros,includes,../shared-templates
+```
+
+### Integration with CI/CD
+
+**GitHub Actions example**:
+```yaml
+name: SQL Linting
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          pip install sqlfluff sqlfluff-templater-schemachange
+          
+      - name: Lint SQL files
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        run: |
+          sqlfluff lint --dialect snowflake scripts/
+```
+
+## Secret Handling
+
+The templater automatically identifies and filters secrets from logs based on:
+
+1. Variable names containing "secret" (case-insensitive)
+2. Variables nested under a "secrets" key
+
+```yaml
+vars:
+  api_key_secret: "sensitive_value"  # Filtered
+  database_password: "password123"   # Not filtered
+  
+  secrets:
+    oauth_token: "token123"          # Filtered
+    encryption_key: "key456"         # Filtered
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Template not found**: Ensure your `modules-folder` is correctly configured
+2. **Undefined variable**: Check your `schemachange-config.yml` and CLI `vars`
+3. **Permission errors**: Verify file paths and permissions for config and template files
+
+### Debug Mode
+
+Enable verbose logging to see what's happening:
+
+```bash
+sqlfluff lint --verbose --debug
+```
+
+### Environment Variables
+
+Use environment variables for sensitive configuration:
+
+```bash
+export SNOWFLAKE_ACCOUNT="your-account"
+export SNOWFLAKE_USER="your-user"
+sqlfluff lint
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Related Projects
+
+- [SQLFluff](https://github.com/sqlfluff/sqlfluff) - The SQL linter this plugin extends
+- [schemachange](https://github.com/Snowflake-Labs/schemachange) - Database change management tool this integrates with
+- [Snowflake](https://www.snowflake.com/) - Cloud data platform
