@@ -143,8 +143,8 @@ modules-folder: 'templates'
         advanced_sql = """{% from "common.sql" import audit_columns %}
 
 CREATE TABLE users (
-    id INTEGER,
-    name VARCHAR(255),
+    id_field INTEGER,
+    name_field VARCHAR(255),
     {{ audit_columns() }}
 );
 
@@ -156,7 +156,7 @@ CREATE TABLE events (
 );
 {% else %}
 CREATE TABLE events (
-    id INTEGER,
+    id_event INTEGER,
     created_at TIMESTAMP
 );
 {% endif %}

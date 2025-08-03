@@ -58,7 +58,7 @@ sqlfluff-templater-schemachange = "sqlfluff_templater_schemachange:main"
 include = ["sqlfluff_templater_schemachange*"]
 
 [project.entry-points."sqlfluff"]
-sqlfluff_templater_schemachange = "sqlfluff_templater_schemachange"
+schemachange = "sqlfluff_templater_schemachange"
 
 [tool.black]
 line-length = 88
