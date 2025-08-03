@@ -6,6 +6,7 @@ repos:
       - id: black
         language_version: python3
         args: [--line-length=88]
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # Python import sorting
   - repo: https://github.com/pycqa/isort
@@ -13,12 +14,14 @@ repos:
     hooks:
       - id: isort
         args: [--profile=black]
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # Python linting
   - repo: https://github.com/pycqa/flake8
     rev: 6.0.0
     hooks:
       - id: flake8
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -27,7 +30,7 @@ repos:
       - id: mypy
         additional_dependencies: [types-PyYAML]
         args: [--ignore-missing-imports]
-        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
+        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # SQLFluff linting for SQL files (using local development package)
   # NOTE: Requires 'pip install -e .' to be run first to install the development package
@@ -56,16 +59,23 @@ repos:
     rev: v4.4.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: end-of-file-fixer
-        exclude: ^LICENSE$
+        exclude: ^(LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: check-yaml
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: check-json
-        exclude: bandit-report\.json$
+        exclude: ^(bandit-report\.json$|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: check-added-large-files
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: check-case-conflict
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: check-merge-conflict
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: debug-statements
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
       - id: requirements-txt-fixer
+        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
@@ -74,7 +84,7 @@ repos:
       - id: bandit
         args: [--recursive, --format, json, --output, bandit-report.json, --configfile, .bandit]
         files: \.py$
-        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE)$
+        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
   # Documentation linting
   - repo: https://github.com/pycqa/pydocstyle
@@ -82,7 +92,7 @@ repos:
     hooks:
       - id: pydocstyle
         args: [--convention=google]
-        exclude: ^(dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE)$
+        exclude: ^(dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
 # Configuration for specific hooks
 ci:

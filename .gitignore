@@ -25,6 +25,9 @@ wheels/
 *.egg
 MANIFEST
 
+# Generated package metadata
+sqlfluff_templater_schemachange.egg-info/
+
 # Virtual environments
 .env
 .venv
