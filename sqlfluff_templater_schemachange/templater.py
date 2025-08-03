@@ -2,418 +2,139 @@
 Schemachange templater for SQLFluff.
 
 This templater integrates with the schemachange database change management tool,
-using schemachange's native render functionality to process Jinja templates.
+extending SQLFluff's JinjaTemplater to add schemachange-specific functionality:
+- Reads variables and macros from schemachange config files
+- Adds schemachange's env_var() function
+- Supports schemachange's macro loading from modules folder
 """
 
-import subprocess
-import tempfile
 import os
+import yaml
 import json
 import logging
-from typing import Dict, Any
+from pathlib import Path
+from typing import Dict, Any, Optional
 
-from sqlfluff.core.templaters.base import TemplatedFile, RawTemplater
+from sqlfluff.core.templaters.jinja import JinjaTemplater
 from sqlfluff.core.errors import SQLTemplaterError
-
-# Try to import the slice classes
-try:
-    from sqlfluff.core.templaters.base import RawFileSlice, TemplatedFileSlice
-except ImportError:
-    try:
-        from sqlfluff.core.templaters import RawFileSlice, TemplatedFileSlice
-    except ImportError:
-        # If we can't import them, we'll need to create our own
-        from dataclasses import dataclass
-        from typing import Optional
-        
-        @dataclass
-        class RawFileSlice:
-            raw: str
-            slice_type: str
-            source_idx: int
-            block_idx: int
-            tag: Optional[str] = None
-        
-        @dataclass
-        class TemplatedFileSlice:
-            slice_type: str
-            source_slice: slice
-            templated_slice: slice
 
 logger = logging.getLogger(__name__)
 
 
-class SchemachangeTemplater(RawTemplater):
+class SchemachangeTemplater(JinjaTemplater):
     """
-    A templater that uses schemachange's native render command to process Jinja templates.
+    A SQLFluff templater that extends JinjaTemplater with schemachange functionality.
     
-    This templater calls schemachange render directly, ensuring 100% compatibility
-    with schemachange's templating system including:
-    - Jinja2 templating with variables from schemachange-config.yml
-    - Macro templates from modules folder
-    - Environment variable substitution
-    - All schemachange templating features
+    This templater leverages SQLFluff's sophisticated JinjaTemplater while adding
+    schemachange-specific features:
+    - Reads variables and macros from schemachange-config.yml files
+    - Supports schemachange's modules folder for macro loading  
+    - Adds env_var() function for environment variable access
+    - Maintains full compatibility with schemachange templating behavior
     """
     
     name = "schemachange"
-    sequential_fail_limit = 3
-    # print("SchemachangeTemplater initialized")
-        
+    
     def config_pairs(self):
         """Return configuration options for this templater."""
-        return [
+        return super().config_pairs() + [
             ("config_folder", '.'),
+            ("config_file", 'schemachange-config.yml'),
             ("root_folder", '.'),
             ("modules_folder", '.'),
             ("vars", {}),
-            ("verbose", False),
         ]
-
-    def process(self, *, fname, in_str, config=None, formatter=None):
-        """
-        Process the given string using schemachange's native render command.
+    
+    def _load_schemachange_config(self, config_folder: str, config_file: str = 'schemachange-config.yml') -> Dict[str, Any]:
+        """Load schemachange configuration from YAML file."""
+        config_path = Path(config_folder) / config_file
         
-        Args:
-            fname: The filename being processed
-            in_str: The input SQL string
-            config: SQLFluff configuration object
-            formatter: Optional formatter (not used)
-            
-        Returns:
-            TemplatedFile: The templated result
-        """
-        # print(f"🔧 PROCESS called - Processing file: {fname}")
-        # print(f"📝 Input string: {in_str}")
-        # print(f"🎨 Formatter: {formatter}")
+        if not config_path.exists():
+            logger.debug(f"Schemachange config file not found at {config_path}")
+            return {}
         
-        # Get templater configuration
         try:
-            templater_section = config.get_section(("templater", "SchemachangeTemplater"))
-            # print(f"Templater config section: {templater_section}")
+            with open(config_path, 'r') as f:
+                schema_config = yaml.safe_load(f) or {}
+            logger.debug(f"Loaded schemachange config from {config_path}")
+            return schema_config
         except Exception as e:
-            logger.warning(f"Error getting templater section: {e}")
-            templater_section = {}
+            logger.warning(f"Failed to load schemachange config from {config_path}: {e}")
+            return {}
+    
+    def _get_context_from_config(self, config, schemachange_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Build Jinja context combining SQLFluff config and schemachange config."""
+        context = {}
+        
+        # Start with parent JinjaTemplater context
         try:
-            # Get templater configuration - using correct path
-            templater_config = config.get_section(("templater", "SchemachangeTemplater")) or {}
-            ends_with_semicolon = in_str.endswith(';')
-            ends_with_semicolon_newline = in_str.endswith(';\n')
-            # Create temporary file for SQL content
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False, dir=os.getcwd()) as  temp_file:
-                temp_file.write(in_str)
-                temp_file_path = temp_file.name
-            
+            if config:
+                parent_context = super()._get_context_from_config(config)
+                if parent_context:
+                    context.update(parent_context)
+        except Exception as e:
+            logger.debug(f"No parent context available: {e}")
+        
+        # Add schemachange variables
+        if 'vars' in schemachange_config:
+            schema_vars = schemachange_config['vars']
+            if isinstance(schema_vars, dict):
+                context.update(schema_vars)
+        
+        # Add templater-specific vars from SQLFluff config
+        templater_config = {}
+        if config:
             try:
-                # Build schemachange render command
-                cmd = ['schemachange', 'render',  os.path.basename(temp_file_path)]
-                # Add optional parameters based on configuration
-                if templater_config.get('config_folder'):
-                    cmd.extend(['--config-folder', templater_config['config_folder']])
-                    
-                if templater_config.get('root_folder'):
-                    cmd.extend(['-f', templater_config['root_folder']])
-                    
-                if templater_config.get('modules_folder'):
-                    cmd.extend(['-m', templater_config['modules_folder']])
-                    
-                if templater_config.get('vars'):
-                    # Convert vars to JSON string for schemachange
-                    vars_json = json.dumps(templater_config['vars'])
-                    cmd.extend(['--vars', vars_json])
-                    
-                if templater_config.get('verbose', False):
-                    cmd.append('-v')
-                
-                logger.debug(f"Executing schemachange command: {' '.join(cmd)}")
-                # print(f"Executing schemachange command: {' '.join(cmd)}")
-                
-                # Execute schemachange render
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd=os.getcwd()
-                )
-                
-                if result.returncode != 0:
-                    error_msg = result.stderr.strip() or result.stdout.strip()
-                    raise SQLTemplaterError(
-                        f"Schemachange render failed: {error_msg}",
-                        line_no=None,
-                        line_pos=None,
-                    )
-                
-                # Parse rendered content from schemachange stdout 
-                stdout = result.stdout.strip()
-                if 'content=' in stdout:
-                    # print(f"📝 Found 'content=' in stdout, attempting regex extraction")
-                    # Extract content from the success log line - more robust regex
-                    import re
-                    # Try first pattern that captures everything between content= and schemachange_version=
-                    match = re.search(r'content=(.+?)(?=\s*schemachange_version=)', stdout, re.DOTALL)
-                    if not match:
-                        # Fallback: try to capture content= to end of line/output
-                        match = re.search(r'content=(.+?)(?=\s*$)', stdout, re.DOTALL | re.MULTILINE)
-                    
-                    if match:
-                        rendered_sql = match.group(1)
-                        # fix for when schemachange deletes the trailing semicolon and whitespace if present on render
-                        if ends_with_semicolon:
-                            rendered_sql = rendered_sql + ';'
-                        if ends_with_semicolon_newline:
-                            rendered_sql = rendered_sql + ';\n'
-                        # print(f"✅ Regex extraction SUCCESS")
-                    else:
-                        logger.warning("Regex extraction failed - using original SQL")
-                        rendered_sql = in_str  # Fallback to original
-                else:
-                    logger.warning("No 'content=' found in stdout - using original SQL")
-                    rendered_sql = in_str  # Fallback to original
-                
-                # Handle case where schemachange returns empty output
-                if not rendered_sql:
-                    logger.warning("Schemachange render returned empty output, using original SQL")
-                    rendered_sql = in_str
-                
-                # Preserve trailing whitespace from original input to avoid issues with fix operations
-                # Check if original input ends with whitespace/newlines
-                original_trailing = ''
-                if in_str and in_str[-1] in (' ', '\t', '\n', '\r'):
-                    # Find all trailing whitespace
-                    i = len(in_str) - 1
-                    while i >= 0 and in_str[i] in (' ', '\t', '\n', '\r'):
-                        i -= 1
-                    original_trailing = in_str[i + 1:]
-                    
-                    # If rendered SQL doesn't end with the same trailing whitespace, add it
-                    if original_trailing and not rendered_sql.endswith(original_trailing):
-                        rendered_sql = rendered_sql.rstrip() + original_trailing
-                
-                # print(f"✅ Rendered SQL content:\n{rendered_sql}")
-                # print(f"📏 Length: {len(rendered_sql)} characters")
-                
-                logger.debug(f"Schemachange render successful. Input length: {len(in_str)}, Output length: {len(rendered_sql)}")
-                
-                # Manual slicing approach - create position mapping between input and output
-                # print(f"🔍 Creating manual slices:")
-                # print(f"   Input: {repr(in_str)} (length: {len(in_str)})")
-                # print(f"   Output: {repr(rendered_sql)} (length: {len(rendered_sql)})")
-                
-                # Create accurate slices with contiguity validation
-                import re
-                from difflib import SequenceMatcher
-                
-                templated_file_slices = []
-                raw_file_slices = []
-                
-                # Use difflib to find the actual differences between input and rendered SQL
-                matcher = SequenceMatcher(None, in_str, rendered_sql)
-                
-                # Process each matching block and difference, ensuring contiguity
-                last_source_end = 0
-                last_templated_end = 0
-                
-                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-                    # Fill any gap in source coverage
-                    if i1 > last_source_end:
-                        gap_content = in_str[last_source_end:i1]
-                        # This gap represents removed Jinja control structures
-                        templated_file_slices.append(
-                            TemplatedFileSlice(
-                                slice_type='templated',
-                                source_slice=slice(last_source_end, i1),
-                                templated_slice=slice(last_templated_end, last_templated_end)  # Zero-length in output
-                            )
-                        )
-                        raw_file_slices.append(
-                            RawFileSlice(
-                                raw=gap_content,
-                                slice_type='templated',
-                                source_idx=last_source_end,
-                                block_idx=0,
-                                tag=None
-                            )
-                        )
-                    
-                    # Process the current operation
-                    if tag == 'equal':
-                        # Literal content that didn't change
-                        if i2 > i1:  # Only if there's actual content
-                            literal_content = in_str[i1:i2]
-                            
-                            templated_file_slices.append(
-                                TemplatedFileSlice(
-                                    slice_type='literal',
-                                    source_slice=slice(i1, i2),
-                                    templated_slice=slice(j1, j2)
-                                )
-                            )
-                            
-                            raw_file_slices.append(
-                                RawFileSlice(
-                                    raw=literal_content,
-                                    slice_type='literal',
-                                    source_idx=i1,
-                                    block_idx=0,
-                                    tag=None
-                                )
-                            )
-                    
-                    elif tag in ['replace', 'delete', 'insert']:
-                        # This represents a template substitution or change
-                        if i2 > i1:  # There was content in the source
-                            source_content = in_str[i1:i2]
-                            
-                            # Check if this is a Jinja template variable or control structure
-                            if ('{{' in source_content and '}}' in source_content) or ('{%' in source_content and '%}' in source_content):
-                                slice_type = 'templated'
-                            else:
-                                slice_type = 'literal'
-                            
-                            templated_file_slices.append(
-                                TemplatedFileSlice(
-                                    slice_type=slice_type,
-                                    source_slice=slice(i1, i2),
-                                    templated_slice=slice(j1, j2)
-                                )
-                            )
-                            
-                            raw_file_slices.append(
-                                RawFileSlice(
-                                    raw=source_content,
-                                    slice_type=slice_type,
-                                    source_idx=i1,
-                                    block_idx=0,
-                                    tag=None
-                                )
-                            )
-                    
-                    # Update tracking positions
-                    last_source_end = max(last_source_end, i2)
-                    last_templated_end = max(last_templated_end, j2)
-                
-                # Handle any remaining content at the end
-                if last_source_end < len(in_str):
-                    gap_content = in_str[last_source_end:]
-                    templated_file_slices.append(
-                        TemplatedFileSlice(
-                            slice_type='templated',
-                            source_slice=slice(last_source_end, len(in_str)),
-                            templated_slice=slice(last_templated_end, last_templated_end)  # Zero-length in output
-                        )
-                    )
-                    raw_file_slices.append(
-                        RawFileSlice(
-                            raw=gap_content,
-                            slice_type='templated',
-                            source_idx=last_source_end,
-                            block_idx=0,
-                            tag=None
-                        )
-                    )
-                
-                # Validate contiguity
-                def validate_slice_contiguity(slices, total_length, slice_name):
-                    if not slices:
-                        return True, []
-                    
-                    errors = []
-                    expected_pos = 0
-                    
-                    for i, slice_obj in enumerate(slices):
-                        if hasattr(slice_obj, 'source_slice'):
-                            start = slice_obj.source_slice.start
-                            end = slice_obj.source_slice.stop
-                        else:
-                            start = slice_obj.source_idx
-                            end = start + len(slice_obj.raw)
-                        
-                        if start != expected_pos:
-                            errors.append(f"Gap in {slice_name} at position {expected_pos}-{start}")
-                        
-                        expected_pos = end
-                    
-                    if expected_pos != total_length:
-                        errors.append(f"Final {slice_name} position {expected_pos} != total length {total_length}")
-                    
-                    return len(errors) == 0, errors
-                
-                # Validate both slice sets
-                source_valid, source_errors = validate_slice_contiguity(templated_file_slices, len(in_str), "source slices")
-                
-                # Validate template slice coverage 
-                total_templated_length = sum(
-                    max(0, slice_obj.templated_slice.stop - slice_obj.templated_slice.start)
-                    for slice_obj in templated_file_slices
-                )
-                template_length_valid = total_templated_length == len(rendered_sql)
-                
-                # If validation fails, fall back to simple slicing
-                if not source_valid or not template_length_valid:
-                    logger.warning(f"Complex slicing failed, falling back to simple approach")
-                    logger.warning(f"Source valid: {source_valid}, Template length: {total_templated_length}/{len(rendered_sql)}")
-                    
-                    # Simple fallback: treat entire input as templated
-                    templated_file_slices = [
-                        TemplatedFileSlice(
-                            slice_type='templated',
-                            source_slice=slice(0, len(in_str)),
-                            templated_slice=slice(0, len(rendered_sql))
-                        )
-                    ]
-                    
-                    raw_file_slices = [
-                        RawFileSlice(
-                            raw=in_str,
-                            slice_type='templated',
-                            source_idx=0,
-                            block_idx=0,
-                            tag=None
-                        )
-                    ]
-                    
-                    logger.info("Using simple fallback slicing for complex template")
-                else:
-                    logger.debug("Complex slicing validation passed")
-                
-                # print(f"   Created {len(templated_file_slices)} slices")
-                # print(f"   templated_file_slices: {templated_file_slices}")
-                # print(f"   raw_file_slices: {raw_file_slices}")
-                
-                # Create the templated file object with manual slicing
-                templated_file = TemplatedFile(
-                source_str=in_str,
-                templated_str=rendered_sql,
-                fname=fname,
-                    sliced_file=templated_file_slices,
-                    raw_sliced=raw_file_slices,
-                )
-                
-                return templated_file, []
-                
-            finally:
-                # Clean up temporary file
-                try:
-                    os.unlink(temp_file_path)
-                except OSError:
-                    logger.warning(f"Failed to clean up temporary file: {temp_file_path}")
-                
-        except subprocess.TimeoutExpired:
-            raise SQLTemplaterError(
-                "Schemachange render command timed out (30s limit)",
-                line_no=None,
-                line_pos=None,
-            )
-        except FileNotFoundError:
-            raise SQLTemplaterError(
-                "Schemachange command not found. Please ensure schemachange is installed and available in PATH.",
-                line_no=None,
-                line_pos=None,
-            )
-        except Exception as e:
-            raise SQLTemplaterError(
-                f"Error calling schemachange render: {str(e)}",
-                line_no=None,
-                line_pos=None,
-            )
+                templater_config = config.get_section(("templater", self.name)) or {}
+            except Exception as e:
+                logger.debug(f"Could not get templater config for context: {e}")
+        
+        if 'vars' in templater_config:
+            context.update(templater_config['vars'])
+        
+        logger.debug(f"Built context with {len(context)} variables")
+        return context
+    
+    def _get_env_var(self, var_name: str, default_value: str = '') -> str:
+        """Schemachange-compatible env_var function."""
+        return os.environ.get(var_name, default_value)
+    
+    def _get_jinja_env(self, config=None, **kwargs):
+        """Override to add schemachange-specific Jinja environment setup."""
+        # Get the parent Jinja environment
+        env = super()._get_jinja_env(config=config, **kwargs)
+        
+        # Get templater configuration with proper null checking
+        templater_config = {}
+        if config:
+            try:
+                templater_config = config.get_section(("templater", self.name)) or {}
+            except Exception as e:
+                logger.debug(f"Could not get templater config section: {e}")
+                templater_config = {}
+        
+        config_folder = templater_config.get('config_folder', '.')
+        config_file = templater_config.get('config_file', 'schemachange-config.yml')
+        
+        # Load schemachange configuration
+        schemachange_config = self._load_schemachange_config(config_folder, config_file)
+        
+        # Set up macro loading from modules folder
+        modules_folder = templater_config.get('modules_folder') or schemachange_config.get('modules_folder')
+        if modules_folder and Path(modules_folder).exists():
+            # Add modules folder to Jinja loader search path
+            current_loader = env.loader
+            if hasattr(current_loader, 'searchpath'):
+                if modules_folder not in current_loader.searchpath:
+                    current_loader.searchpath.append(modules_folder)
+            logger.debug(f"Added modules folder to Jinja loader: {modules_folder}")
+        
+        # Add schemachange-specific functions to Jinja environment
+        env.globals['env_var'] = self._get_env_var
+        
+        # Add context variables to environment globals
+        context = self._get_context_from_config(config, schemachange_config)
+        env.globals.update(context)
+        
+        logger.debug(f"Configured Jinja environment with {len(env.globals)} globals")
+        return env
