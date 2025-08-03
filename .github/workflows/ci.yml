@@ -325,10 +325,4 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.9'
         run: |
           python test_generator.py
-
-          # Test a few key examples
-          cd temp/basic
-          sqlfluff lint test.sql --dialect snowflake
-
-          cd ../advanced
-          sqlfluff lint migrations/ --dialect snowflake
+          python test_scenario_runner.py

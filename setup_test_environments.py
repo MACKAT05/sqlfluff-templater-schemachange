@@ -509,6 +509,14 @@ class PythonEnvironmentManager:
             logger.error(f"Failed to generate test files: {e}")
             return
 
+        # Run comprehensive test scenarios
+        logger.info("Running comprehensive test scenarios...")
+        try:
+            subprocess.run([sys.executable, "test_scenario_runner.py"], check=True)
+        except Exception as e:
+            logger.error(f"Failed to run test scenarios: {e}")
+            # Don't return here, continue with other tests
+
         # Detect Python versions
         python_versions = self.detect_python_versions()
 

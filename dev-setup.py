@@ -118,6 +118,7 @@ def main():
             print("You're now ready to develop! Next steps:")
         print("   • Make your changes to the code")
         print("   • Add tests in temp/ directory with: python test_generator.py")
+        print("   • Run comprehensive tests with: python test_scenario_runner.py")
         print("   • Run tests with: python setup_test_environments.py")
         print("   • Pre-commit hooks will run automatically on git commit")
         print()

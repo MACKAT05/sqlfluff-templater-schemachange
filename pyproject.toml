@@ -14,7 +14,7 @@ disallow_untyped_defs = false
 ignore_missing_imports = true
 
 [tool.bandit]
-exclude_dirs = ["test_envs", "temp", "tests"]
+exclude_dirs = ["test_envs", "temp", "tests", "LICENSE"]
 skips = ["B101", "B601"]
 
 [tool.pytest.ini_options]

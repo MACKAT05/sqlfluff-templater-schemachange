@@ -434,7 +434,10 @@ python test_generator.py
    # Generate fresh test examples
    python test_generator.py
 
-   # Run comprehensive tests
+   # Run comprehensive tests on generated scenarios
+   python test_scenario_runner.py
+
+   # Run full cross-platform testing
    python setup_test_environments.py
 
    # Test SQLFluff integration

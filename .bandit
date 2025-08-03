@@ -5,6 +5,7 @@ exclude_dirs:
   - test_envs
   - temp
   - tests
+  - LICENSE
 
 # Skip specific security checks that are false positives for development automation
 skips:

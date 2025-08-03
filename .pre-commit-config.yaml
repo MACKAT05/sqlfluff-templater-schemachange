@@ -57,6 +57,7 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: ^LICENSE$
       - id: check-yaml
       - id: check-json
         exclude: bandit-report\.json$
@@ -73,7 +74,7 @@ repos:
       - id: bandit
         args: [--recursive, --format, json, --output, bandit-report.json, --configfile, .bandit]
         files: \.py$
-        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|fix_lint_issues\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
+        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE)$
 
   # Documentation linting
   - repo: https://github.com/pycqa/pydocstyle
@@ -81,7 +82,7 @@ repos:
     hooks:
       - id: pydocstyle
         args: [--convention=google]
-        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
+        exclude: ^(dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE)$
 
 # Configuration for specific hooks
 ci:

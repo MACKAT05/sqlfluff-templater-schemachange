@@ -141,6 +141,7 @@ def main():
             print("• Run: pip install -e .")
         if not results[2]:  # Test examples
             print("• Run: python test_generator.py")
+            print("• Test scenarios: python test_scenario_runner.py")
         if not results[3]:  # Pre-commit
             print("• Run: pip install pre-commit && pre-commit install")
 
