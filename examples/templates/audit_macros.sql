@@ -13,7 +13,7 @@
 {% macro add_data_tags(table_name, classification_level='INTERNAL') %}
     {% if features.enable_data_masking %}
     ALTER TABLE {{ table_name }} SET TAG data_classification = '{{ classification_level }}';
-    
+
         {% if classification_level in data_classification.sensitive_data_tags %}
     ALTER TABLE {{ table_name }} SET TAG sensitive_data = 'true';
     ALTER TABLE {{ table_name }} SET TAG retention_days = '{{ data_classification.pii_retention_days }}';
@@ -24,12 +24,12 @@
 {# Macro to create standard indexes #}
 {% macro create_standard_indexes(table_name, date_column='created_at', key_columns=[]) %}
     -- Standard date-based index for time-series queries
-    CREATE INDEX IF NOT EXISTS idx_{{ table_name }}_{{ date_column }} 
+    CREATE INDEX IF NOT EXISTS idx_{{ table_name }}_{{ date_column }}
     ON {{ table_name }} ({{ date_column }});
-    
+
     {% for column in key_columns %}
     -- Index for {{ column }}
-    CREATE INDEX IF NOT EXISTS idx_{{ table_name }}_{{ column }} 
+    CREATE INDEX IF NOT EXISTS idx_{{ table_name }}_{{ column }}
     ON {{ table_name }} ({{ column }});
     {% endfor %}
 {% endmacro %}
@@ -37,7 +37,7 @@
 {# Macro to generate a staging table from source #}
 {% macro create_staging_table(source_table, staging_table, transformations={}) %}
     CREATE OR REPLACE TABLE {{ staging_table }} AS
-    SELECT 
+    SELECT
         {% for column, transformation in transformations.items() %}
         {{ transformation }} AS {{ column }},
         {% else %}
@@ -64,18 +64,18 @@
     -- Production environment setup
     SET QUERY_TAG = 'PRODUCTION_DEPLOYMENT';
     USE WAREHOUSE {{ performance.warehouse_sizes.etl }}_WH;
-    
+
     {% elif environment == 'staging' %}
-    -- Staging environment setup  
+    -- Staging environment setup
     SET QUERY_TAG = 'STAGING_DEPLOYMENT';
     USE WAREHOUSE {{ performance.warehouse_sizes.analytics }}_WH;
-    
+
     {% else %}
     -- Development environment setup
     SET QUERY_TAG = 'DEV_DEPLOYMENT';
     USE WAREHOUSE {{ performance.warehouse_sizes.reporting }}_WH;
     {% endif %}
-    
+
     USE DATABASE {{ database_name }};
     USE SCHEMA {{ schema_name }};
 {% endmacro %}
@@ -85,23 +85,23 @@
     CREATE TABLE {{ table_name }} (
         {{ table_name }}_id INTEGER AUTOINCREMENT PRIMARY KEY,
         {{ business_key }} VARCHAR(255) NOT NULL,
-        
+
         {% for column in columns %}
         {{ column.name }} {{ column.type }}{% if column.get('not_null') %} NOT NULL{% endif %},
         {% endfor %}
-        
+
         -- SCD Type 2 columns
         valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         valid_to TIMESTAMP DEFAULT '2999-12-31 23:59:59',
         is_current BOOLEAN DEFAULT TRUE,
         version_number INTEGER DEFAULT 1,
-        
+
         {{ audit_columns() }}
     );
-    
+
     -- Create unique index for current records
-    CREATE UNIQUE INDEX idx_{{ table_name }}_current 
-    ON {{ table_name }} ({{ business_key }}) 
+    CREATE UNIQUE INDEX idx_{{ table_name }}_current
+    ON {{ table_name }} ({{ business_key }})
     WHERE is_current = TRUE;
 {% endmacro %}
 

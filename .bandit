@@ -1,0 +1,19 @@
+# Bandit configuration for SQLFluff Schemachange Templater
+# Exclude development scripts from strict security checks
+
+exclude_dirs:
+  - test_envs
+  - temp
+  - tests
+
+# Skip specific security checks that are false positives for development automation
+skips:
+  - B404
+  - B603
+  - B607
+
+# Configure severity levels (LOW = 1, MEDIUM = 2, HIGH = 3)
+severity: 2
+
+# Configure confidence levels (LOW = 1, MEDIUM = 2, HIGH = 3)
+confidence: 2

@@ -18,7 +18,7 @@ A custom SQLFluff templater that provides **schemachange-compatible** Jinja temp
 This templater is ideal when you want to:
 - **Lint schemachange SQL files** with SQLFluff's comprehensive rule set
 - **Use existing schemachange configs** without installing the full schemachange toolchain
-- **Integrate SQL linting** into CI/CD pipelines that use schemachange for deployments  
+- **Integrate SQL linting** into CI/CD pipelines that use schemachange for deployments
 - **Maintain consistency** between your schemachange templates and SQLFluff linting
 
 The templater replicates schemachange's Jinja environment and config parsing, so your templates work identically in both tools.
@@ -86,12 +86,12 @@ vars:
   schema_name: 'ANALYTICS'
   environment: 'production'
   table_prefix: 'fact_'
-  
+
   # Nested variables
   sources:
     raw_database: 'RAW_DATA'
     staging_database: 'STAGING'
-  
+
   # Secret variables (automatically filtered from logs)
   secrets:
     api_key: '{{ env_var("API_KEY") }}'
@@ -176,7 +176,7 @@ Access environment variables using the `env_var()` function:
 USE WAREHOUSE {{ env_var('SNOWFLAKE_WAREHOUSE', 'DEFAULT_WH') }};
 USE DATABASE {{ env_var('DATABASE_NAME', database_name) }};
 
--- Connect to environment-specific database  
+-- Connect to environment-specific database
 USE DATABASE {{ database_name }}_{{ env_var('ENVIRONMENT', 'dev') | upper }};
 
 -- Use secrets from environment
@@ -194,19 +194,19 @@ CREATE TABLE {{ database_name }}.{{ schema_name }}.events (
     event_id INTEGER,
     user_id INTEGER,
     event_data JSON,
-    
+
     {% if environment == 'production' %}
     -- Only add PII columns in production
     user_email VARCHAR(255),
     user_phone VARCHAR(20),
     {% endif %}
-    
+
     created_at TIMESTAMP
 );
 
 {% if environment != 'production' %}
 -- Add test data in non-production environments
-INSERT INTO {{ database_name }}.{{ schema_name }}.events 
+INSERT INTO {{ database_name }}.{{ schema_name }}.events
 VALUES (1, 100, '{"test": true}', CURRENT_TIMESTAMP);
 {% endif %}
 ```
@@ -293,7 +293,7 @@ vars:
 ```yaml
 config-version: 1
 vars:
-  database_name: 'PROD_DATABASE'  
+  database_name: 'PROD_DATABASE'
   environment: 'prod'
   debug_mode: false
 ```
@@ -321,16 +321,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
-          
+
       - name: Install dependencies
         run: |
           pip install sqlfluff sqlfluff-templater-schemachange
-          
+
       - name: Lint SQL files
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -350,7 +350,7 @@ The templater automatically identifies and filters secrets from logs based on:
 vars:
   api_key_secret: "sensitive_value"  # Filtered
   database_password: "password123"   # Not filtered
-  
+
   secrets:
     oauth_token: "token123"          # Filtered
     encryption_key: "key456"         # Filtered
@@ -384,11 +384,68 @@ sqlfluff lint
 
 ## Contributing
 
+### Development Setup
+
+The project includes a development setup script to handle the proper installation order:
+
+```bash
+# Clone the repository
+git clone https://github.com/MACKAT05/sqlfluff-templater-schemachange
+cd sqlfluff-templater-schemachange
+
+# Run the development setup script
+python dev-setup.py
+```
+
+This script will:
+1. Install the package in development mode
+2. Install all development dependencies
+3. Set up pre-commit hooks (requires development package to be installed first)
+4. Generate test examples
+5. Run basic functionality tests
+
+### Manual Development Setup
+
+If you prefer to set up manually:
+
+```bash
+# Install in development mode (critical - must be done first!)
+pip install -e .
+
+# Install development dependencies
+pip install -r requirements.txt
+
+# Install pre-commit (after the package is installed)
+pip install pre-commit
+pre-commit install
+
+# Generate test examples
+python test_generator.py
+```
+
+### Development Workflow
+
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+3. Run the development setup: `python dev-setup.py`
+4. Make your changes
+5. Test your changes:
+   ```bash
+   # Generate fresh test examples
+   python test_generator.py
+
+   # Run comprehensive tests
+   python setup_test_environments.py
+
+   # Test SQLFluff integration
+   cd temp/basic && sqlfluff lint test.sql --dialect snowflake
+   ```
+6. Pre-commit hooks will run automatically on `git commit`
+7. Submit a pull request
+
+### Note on Pre-commit
+
+The pre-commit configuration uses local SQLFluff hooks that require the development package to be installed first. This avoids the chicken-and-egg problem of trying to install the package from PyPI before it's published.
 
 ## License
 

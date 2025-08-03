@@ -43,7 +43,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip list --outdated --format=json > outdated-packages.json || true
-          
+
           # Display outdated packages
           echo "## Outdated Packages" >> $GITHUB_STEP_SUMMARY
           python -c "
@@ -91,7 +91,7 @@ jobs:
             sqlfluff: '2.0.0'
           - os: macos-latest
             sqlfluff: '2.0.0'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,14 +104,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          
+
           # Install specific SQLFluff version
           if [ "${{ matrix.sqlfluff }}" = "latest" ]; then
             pip install sqlfluff
           else
             pip install sqlfluff==${{ matrix.sqlfluff }}
           fi
-          
+
           # Install other dependencies
           pip install PyYAML>=5.1
           pip install -e .
@@ -130,7 +130,7 @@ jobs:
         run: |
           cd temp/advanced
           sqlfluff lint migrations/ --dialect snowflake
-          
+
           # Test rendering
           for file in migrations/*.sql; do
             echo "Testing $file"
@@ -144,7 +144,7 @@ jobs:
           echo "- OS: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
           echo "- Python: ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
           echo "- SQLFluff: ${{ matrix.sqlfluff }}" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ job.status }}" = "success" ]; then
             echo "- Status: ✅ Compatible" >> $GITHUB_STEP_SUMMARY
           else
@@ -220,12 +220,12 @@ jobs:
           from pathlib import Path
           from sqlfluff_templater_schemachange.templater import SchemachangeTemplater
           import yaml
-          
+
           @pytest.fixture
           def temp_config_dir():
               with tempfile.TemporaryDirectory() as temp_dir:
                   temp_path = Path(temp_dir)
-                  
+
                   # Create config file
                   config = {
                       'config-version': 1,
@@ -235,37 +235,37 @@ jobs:
                           'table_prefix': 'test_'
                       }
                   }
-                  
+
                   with open(temp_path / 'schemachange-config.yml', 'w') as f:
                       yaml.dump(config, f)
-                  
+
                   yield temp_path
-          
+
           def test_template_loading_performance(benchmark, temp_config_dir):
               """Benchmark template loading performance."""
               templater = SchemachangeTemplater()
-              
+
               def load_template():
                   return templater._load_schemachange_config(str(temp_config_dir))
-              
+
               result = benchmark(load_template)
               assert result is not None
-          
+
           def test_context_building_performance(benchmark, temp_config_dir):
               """Benchmark context building performance."""
               templater = SchemachangeTemplater()
               config = templater._load_schemachange_config(str(temp_config_dir))
-              
+
               def build_context():
                   return templater._get_context_from_config(None, config)
-              
+
               result = benchmark(build_context)
               assert isinstance(result, dict)
-          
+
           def test_large_template_performance(benchmark):
               """Benchmark performance with large templates."""
               templater = SchemachangeTemplater()
-              
+
               # Create large template content
               template_content = """
               {% for i in range(1000) %}
@@ -276,20 +276,20 @@ jobs:
               );
               {% endfor %}
               """
-              
+
               config = {
                   'vars': {
                       'database_name': 'TEST_DB',
                       'schema_name': 'TEST_SCHEMA'
                   }
               }
-              
+
               def process_large_template():
                   env = templater._get_jinja_env()
                   env.globals.update(config['vars'])
                   template = env.from_string(template_content)
                   return template.render()
-              
+
               result = benchmark(process_large_template)
               assert 'CREATE TABLE' in result
           EOF
@@ -310,19 +310,19 @@ jobs:
           import json
           with open('benchmark.json') as f:
               data = json.load(f)
-          
+
           print('## Performance Benchmarks', file=open('benchmark_summary.md', 'w'))
           print('', file=open('benchmark_summary.md', 'a'))
           print('| Test | Mean Time | Std Dev |', file=open('benchmark_summary.md', 'a'))
           print('|------|-----------|---------|', file=open('benchmark_summary.md', 'a'))
-          
+
           for test in data['benchmarks']:
               name = test['name'].replace('test_', '').replace('_', ' ').title()
               mean = f\"{test['stats']['mean']:.4f}s\"
               stddev = f\"{test['stats']['stddev']:.4f}s\"
               print(f'| {name} | {mean} | {stddev} |', file=open('benchmark_summary.md', 'a'))
           "
-          
+
           cat benchmark_summary.md >> $GITHUB_STEP_SUMMARY
 
   report-results:
@@ -338,27 +338,27 @@ jobs:
         run: |
           echo "# Scheduled Test Results - $(date)" > final_report.md
           echo "" >> final_report.md
-          
+
           echo "## Job Status Summary" >> final_report.md
           echo "- Dependency Check: ${{ needs.dependency-check.result }}" >> final_report.md
           echo "- Compatibility Matrix: ${{ needs.compatibility-matrix.result }}" >> final_report.md
           echo "- Comprehensive Test: ${{ needs.comprehensive-test.result }}" >> final_report.md
           echo "- Performance Benchmark: ${{ needs.performance-benchmark.result }}" >> final_report.md
           echo "" >> final_report.md
-          
+
           # Count successful vs failed jobs
           success_count=0
           total_count=4
-          
+
           if [ "${{ needs.dependency-check.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
           if [ "${{ needs.compatibility-matrix.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
           if [ "${{ needs.comprehensive-test.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
           if [ "${{ needs.performance-benchmark.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
-          
+
           echo "## Overall Status" >> final_report.md
           echo "**$success_count/$total_count jobs completed successfully**" >> final_report.md
           echo "" >> final_report.md
-          
+
           if [ $success_count -eq $total_count ]; then
             echo "🎉 All scheduled tests passed!" >> final_report.md
           else
@@ -378,21 +378,21 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const sha = context.sha;
-            
+
             github.rest.repos.createCommitComment({
               owner,
               repo,
               commit_sha: sha,
               body: `
               ⚠️ Scheduled tests failed for commit ${sha.substring(0, 7)}
-              
+
               Some automated tests are failing. Please check the [workflow run](${context.payload.repository.url}/actions/runs/${context.runId}) for details.
-              
+
               This may indicate:
               - Dependency compatibility issues
               - Regression in functionality
               - Environmental changes
-              
+
               Consider reviewing and fixing the issues before the next release.
               `
             });
@@ -407,7 +407,7 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            
+
             // Keep only the last 10 scheduled test runs
             const runs = await github.rest.actions.listWorkflowRuns({
               owner,
@@ -415,9 +415,9 @@ jobs:
               workflow_id: 'scheduled-tests.yml',
               per_page: 100
             });
-            
+
             const runsToDelete = runs.data.workflow_runs.slice(10);
-            
+
             for (const run of runsToDelete) {
               if (run.status === 'completed') {
                 try {

@@ -28,50 +28,50 @@ vars:
   # Environment settings
   environment: '{{ env_var("ENVIRONMENT", "dev") }}'
   region: 'us-west-2'
-  
+
   # Database configuration
   database_name: 'ANALYTICS_{{ environment | upper }}'
   schema_name: 'CORE'
-  
+
   # Table naming conventions
   table_prefix: 'fact_'
   view_prefix: 'vw_'
   staging_prefix: 'stg_'
-  
+
   # Data sources configuration
   sources:
     raw_database: 'RAW_DATA'
     staging_database: 'STAGING_{{ environment | upper }}'
     analytics_database: 'ANALYTICS_{{ environment | upper }}'
-    
+
     # External stages
     s3_stage: 'S3_DATA_STAGE'
     azure_stage: 'AZURE_DATA_STAGE'
-  
+
   # Business logic configuration
   business_rules:
     retention_days: 365
     batch_size: 10000
     enable_auditing: true
-    
+
   # Date/time settings
   default_timezone: 'UTC'
   fiscal_year_start: '04-01'  # April 1st
-  
+
   # Feature flags
   features:
     enable_data_masking: '{{ env_var("ENABLE_DATA_MASKING", "false") | bool }}'
     enable_column_encryption: true
     enable_row_level_security: '{{ environment == "prod" }}'
-  
+
   # Security and compliance
   data_classification:
     pii_retention_days: 90
     sensitive_data_tags:
       - 'PII'
-      - 'SENSITIVE' 
+      - 'SENSITIVE'
       - 'CONFIDENTIAL'
-  
+
   # Performance tuning
   performance:
     clustering_keys:
@@ -81,23 +81,23 @@ vars:
       etl: 'LARGE'
       analytics: 'MEDIUM'
       reporting: 'SMALL'
-  
+
   # Secrets (these will be filtered from logs)
   secrets:
     api_key: '{{ env_var("API_KEY") }}'
     database_password: '{{ env_var("DB_PASSWORD") }}'
     encryption_key: '{{ env_var("ENCRYPTION_KEY") }}'
     oauth_client_secret: '{{ env_var("OAUTH_CLIENT_SECRET") }}'
-    
+
   # External system integration
   external_systems:
     salesforce:
       instance_url: 'https://{{ env_var("SF_INSTANCE") }}.salesforce.com'
       api_version: 'v52.0'
-    
+
     hubspot:
       portal_id: '{{ env_var("HUBSPOT_PORTAL_ID") }}'
-      
+
     slack:
       webhook_url: '{{ env_var("SLACK_WEBHOOK_URL") }}'
       channel: '#data-alerts'

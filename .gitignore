@@ -65,6 +65,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Security scan reports
+bandit-report.json
+
 # mypy
 .mypy_cache/
 .dmypy.json

@@ -4,7 +4,7 @@ This directory contains example SQL files that demonstrate the SQLFluff schemach
 
 ## Files
 
-### SQL Migration Files  
+### SQL Migration Files
 - `migrations/V1.0.1__create_base_tables.sql` - Basic table creation with templating
 - `migrations/V1.0.2__create_advanced_tables.sql` - Advanced tables with complex Jinja logic
 - `migrations/R__create_views.sql` - Repeatable views with templated names
@@ -52,7 +52,7 @@ sqlfluff lint migrations/ --config .sqlfluff --dialect snowflake
 
 The examples use these template variables (defined in `schemachange-config.yml`):
 
-- `database_name` → `MY_DATABASE` 
+- `database_name` → `MY_DATABASE`
 - `schema_name` → `ANALYTICS`
 - `table_name` → `customers`
 - `state_filter` → `CA`
@@ -67,14 +67,14 @@ The examples use these template variables (defined in `schemachange-config.yml`)
 - **LT05**: Comma placement
 - **LT12**: Trailing newline requirements
 
-### Capitalization (CP rules)  
+### Capitalization (CP rules)
 - **CP01**: Keyword capitalization
 - **CP02**: Identifier capitalization
 - **CP03**: Function name capitalization
 
 ### References (RF rules)
 - **RF01**: Column references
-- **RF02**: Table references  
+- **RF02**: Table references
 - **RF04**: Keywords used as identifiers
 
 ### Aliasing (AL rules)
@@ -95,5 +95,5 @@ The examples use these template variables (defined in `schemachange-config.yml`)
 ## Common Issues
 
 - **Missing Variables**: Ensure all template variables are defined in the schemachange config
-- **Path Issues**: Run commands from the examples directory so relative paths work correctly  
+- **Path Issues**: Run commands from the examples directory so relative paths work correctly
 - **Rule Conflicts**: Some rules may conflict with your coding standards - adjust `.sqlfluff` as needed

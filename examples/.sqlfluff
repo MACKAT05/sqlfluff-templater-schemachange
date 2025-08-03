@@ -4,10 +4,7 @@ dialect = snowflake
 templater = schemachange
 
 # Common rule exclusions for development/testing
-exclude_rules = 
-    # Disable some rules that might be too strict for examples
-    references.keywords,  # RF04 - allow 'name' as column name for examples
-    structure.column_order  # ST06 - allow flexible column ordering
+exclude_rules = references.keywords,structure.column_order
 
 # Line length
 max_line_length = 120
@@ -18,13 +15,8 @@ verbose = 0
 [sqlfluff:templater:schemachange]
 # Point to the test config file
 config_folder = .
-vars = {
-    "database_name": "MY_DATABASE",
-    "schema_name": "ANALYTICS",
-    "table_name": "customers", 
-    "state_filter": "CA",
-    "start_date": "2023-01-01"
-}
+modules_folder = templates
+vars = {"database_name": "MY_DATABASE", "schema_name": "ANALYTICS", "table_name": "customers", "state_filter": "CA", "start_date": "2023-01-01"}
 
 [sqlfluff:indentation]
 # Use consistent indentation
@@ -36,7 +28,7 @@ template_blocks_indent = False
 # Prefer lowercase for keywords (more modern style)
 capitalisation_policy = lower
 
-[sqlfluff:rules:capitalisation.identifiers] 
+[sqlfluff:rules:capitalisation.identifiers]
 # Keep identifiers lowercase
 extended_capitalisation_policy = lower
 

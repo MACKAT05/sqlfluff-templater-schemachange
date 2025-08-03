@@ -1,2 +1,2 @@
 sqlfluff>=2.0.0
-schemachange>=4.0.0
+PyYAML>=5.1

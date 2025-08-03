@@ -67,7 +67,7 @@ sqlfluff lint test.sql
 The schemachange templater integrates with SQLFluff's templating system by:
 
 1. **Configuration Loading**: Reads `schemachange-config.yml` with environment variable substitution
-2. **Variable Extraction**: Merges variables from config file and CLI arguments  
+2. **Variable Extraction**: Merges variables from config file and CLI arguments
 3. **Jinja Environment Setup**: Creates a Jinja environment with proper search paths and functions
 4. **Template Rendering**: Processes SQL files using Jinja2 templating
 5. **Secret Filtering**: Automatically filters sensitive variables from logs
@@ -81,7 +81,7 @@ The schemachange templater integrates with SQLFluff's templating system by:
 # Path to schemachange config (auto-discovered if not specified)
 config_file = schemachange-config.yml
 
-# Additional variables (merged with config file vars)  
+# Additional variables (merged with config file vars)
 vars = {"debug_mode": true, "linting": true}
 
 
@@ -106,10 +106,10 @@ vars:
   sources:
     raw: 'RAW_DATABASE'
     staging: 'STAGING_DATABASE'
-  
+
   features:
     enable_masking: '{{ env_var("ENABLE_MASKING", "false") | bool }}'
-    
+
   secrets:
     api_key: '{{ env_var("API_KEY") }}'  # Automatically filtered from logs
 ```
@@ -209,7 +209,7 @@ vars = {"environment": "dev", "debug": true}
 
 **Production** (CI/CD):
 ```ini
-[sqlfluff:templater:schemachange]  
+[sqlfluff:templater:schemachange]
 config_folder = configs
 config_file = prod.yml
 vars = {"environment": "prod", "debug": false}
@@ -249,16 +249,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
-          
+
       - name: Install dependencies
         run: |
           pip install sqlfluff sqlfluff-templater-schemachange
-          
+
       - name: Lint SQL files
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}

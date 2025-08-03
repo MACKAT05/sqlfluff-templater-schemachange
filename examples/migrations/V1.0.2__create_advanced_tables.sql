@@ -27,25 +27,25 @@ CREATE TABLE {{ table_prefix }}events (
     customer_id INTEGER,
     event_type VARCHAR(50) NOT NULL,
     event_timestamp TIMESTAMP NOT NULL,
-    
+
     -- Dynamic columns based on event types
     {% for event_type, fields in {
         'purchase': ['product_id INTEGER', 'amount DECIMAL(10,2)', 'currency VARCHAR(3)'],
         'page_view': ['page_url VARCHAR(500)', 'referrer VARCHAR(500)', 'session_id VARCHAR(255)'],
         'login': ['login_method VARCHAR(50)', 'ip_address VARCHAR(45)', 'user_agent VARCHAR(1000)']
     }.items() %}
-    
+
     -- {{ event_type | title }} event fields
         {% for field in fields %}
     {{ field }},
         {% endfor %}
     {% endfor %}
-    
+
     -- Additional metadata
     event_metadata JSON,
-    
+
     {{ audit_columns() }}
-    
+
 ) {% if performance.clustering_keys.events %}
 CLUSTER BY ({{ performance.clustering_keys.events | join(', ') }})
 {% endif %};
@@ -53,7 +53,7 @@ CLUSTER BY ({{ performance.clustering_keys.events | join(', ') }})
 -- Create aggregation tables for different time periods
 {% for period, date_func in {
     'daily': 'DATE_TRUNC(day, event_timestamp)',
-    'weekly': 'DATE_TRUNC(week, event_timestamp)', 
+    'weekly': 'DATE_TRUNC(week, event_timestamp)',
     'monthly': 'DATE_TRUNC(month, event_timestamp)'
 }.items() %}
 
@@ -63,7 +63,7 @@ CREATE TABLE {{ table_prefix }}events_{{ period }}_summary (
     event_type VARCHAR(50) NOT NULL,
     event_count INTEGER NOT NULL,
     unique_customers INTEGER NOT NULL,
-    
+
     {% if period == 'daily' %}
     -- Add hourly breakdown for daily summaries
     hour_0 INTEGER DEFAULT 0,
@@ -91,13 +91,13 @@ CREATE TABLE {{ table_prefix }}events_{{ period }}_summary (
     hour_22 INTEGER DEFAULT 0,
     hour_23 INTEGER DEFAULT 0,
     {% endif %}
-    
+
     {{ audit_columns() }}
 );
 
 -- Create unique constraint for the summary table
-ALTER TABLE {{ table_prefix }}events_{{ period }}_summary 
-ADD CONSTRAINT uk_{{ period }}_summary 
+ALTER TABLE {{ table_prefix }}events_{{ period }}_summary
+ADD CONSTRAINT uk_{{ period }}_summary
 UNIQUE (summary_date, event_type);
 
 {% endfor %}
@@ -111,15 +111,15 @@ CREATE TABLE {{ staging_prefix }}salesforce_accounts (
     industry VARCHAR(100),
     annual_revenue DECIMAL(15,2),
     employee_count INTEGER,
-    
+
     -- Salesforce metadata
     sf_created_date TIMESTAMP,
     sf_last_modified_date TIMESTAMP,
-    
+
     {{ audit_columns() }}
 );
 
-COMMENT ON TABLE {{ staging_prefix }}salesforce_accounts 
+COMMENT ON TABLE {{ staging_prefix }}salesforce_accounts
 IS 'Salesforce account data from {{ external_systems.salesforce.instance_url }}';
 {% endif %}
 
@@ -132,12 +132,12 @@ CREATE TABLE {{ staging_prefix }}hubspot_contacts (
     company VARCHAR(255),
     job_title VARCHAR(200),
     lifecycle_stage VARCHAR(50),
-    
+
     -- HubSpot specific fields
     hs_created_date TIMESTAMP,
     hs_last_modified_date TIMESTAMP,
     portal_id INTEGER DEFAULT {{ external_systems.hubspot.portal_id }},
-    
+
     {{ audit_columns() }}
 );
 {% endif %}
@@ -152,7 +152,7 @@ CREATE TABLE metadata_data_quality_checks (
     actual_result VARCHAR(255),
     status VARCHAR(20) NOT NULL, -- 'PASS', 'FAIL', 'WARNING'
     check_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     {{ audit_columns() }}
 );
 
@@ -167,9 +167,9 @@ CREATE TABLE metadata_data_quality_checks (
 -- Create views for analysts with row-level security if enabled
 {% if features.enable_row_level_security and environment == 'prod' %}
 
-CREATE OR REPLACE ROW ACCESS POLICY customer_access_policy AS (region VARCHAR(50)) 
+CREATE OR REPLACE ROW ACCESS POLICY customer_access_policy AS (region VARCHAR(50))
 RETURNS BOOLEAN ->
-    CASE 
+    CASE
         WHEN CURRENT_ROLE() = 'ADMIN' THEN TRUE
         WHEN CURRENT_ROLE() = 'ANALYST_US' AND region = 'us-west-2' THEN TRUE
         WHEN CURRENT_ROLE() = 'ANALYST_EU' AND region = 'eu-west-1' THEN TRUE
@@ -177,7 +177,7 @@ RETURNS BOOLEAN ->
     END;
 
 -- Apply row access policy to events table
-ALTER TABLE {{ table_prefix }}events 
+ALTER TABLE {{ table_prefix }}events
 SET ROW ACCESS POLICY customer_access_policy ON (region);
 
 {% endif %}
@@ -186,7 +186,7 @@ SET ROW ACCESS POLICY customer_access_policy ON (region);
 {% if environment != 'dev' %}
 
 CREATE MATERIALIZED VIEW {{ view_prefix }}customer_event_summary AS
-SELECT 
+SELECT
     c.customer_id,
     c.customer_key,
     c.first_name,

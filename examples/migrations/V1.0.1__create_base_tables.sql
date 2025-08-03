@@ -13,20 +13,20 @@ CREATE TABLE {{ table_prefix }}customers (
     email VARCHAR(255),
     phone VARCHAR(20),
     registration_date DATE,
-    
+
     {% if features.enable_data_masking %}
     -- Add masking policy for PII fields when enabled
     CONSTRAINT email_masking MASKING POLICY email_mask,
     CONSTRAINT phone_masking MASKING POLICY phone_mask,
     {% endif %}
-    
+
     -- Audit columns
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(255) DEFAULT CURRENT_USER()
 );
 
--- Create products dimension table  
+-- Create products dimension table
 CREATE TABLE {{ table_prefix }}products (
     product_id INTEGER PRIMARY KEY,
     product_sku VARCHAR(100) UNIQUE NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE {{ table_prefix }}products (
     brand VARCHAR(100),
     unit_cost DECIMAL(10,2),
     unit_price DECIMAL(10,2),
-    
+
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -47,20 +47,20 @@ CREATE TABLE {{ table_prefix }}sales (
     sale_id INTEGER PRIMARY KEY,
     customer_id INTEGER REFERENCES {{ table_prefix }}customers(customer_id),
     product_id INTEGER REFERENCES {{ table_prefix }}products(product_id),
-    
+
     sale_date DATE NOT NULL,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
     discount_amount DECIMAL(10,2) DEFAULT 0,
-    
+
     -- Regional information
     region VARCHAR(50) DEFAULT '{{ region }}',
-    
+
     -- Audit trail
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     source_system VARCHAR(50) DEFAULT 'SCHEMACHANGE'
-    
+
     {% if performance.clustering_keys.transactions %}
     -- Add clustering for performance
 ) CLUSTER BY ({{ performance.clustering_keys.transactions | join(', ') }});

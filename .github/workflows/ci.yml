@@ -36,6 +36,9 @@ jobs:
 
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.0
+        env:
+          # Ensure pre-commit uses the installed development package
+          SKIP: no-commit-to-branch
 
   test:
     name: Test on Python ${{ matrix.python }}
@@ -44,7 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ['3.8', '3.9', '3.10', '3.11']
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,11 +80,11 @@ jobs:
           # Test basic functionality
           cd temp/basic
           sqlfluff lint --dialect snowflake test.sql
-          
+
           # Test advanced functionality
           cd ../advanced
           sqlfluff lint --dialect snowflake migrations/
-          
+
           # Test environment-specific configs
           cd ../environments/dev
           sqlfluff lint --dialect snowflake ../shared/V1.0.1__env_specific.sql
@@ -126,7 +129,7 @@ jobs:
           # Test existing examples
           if [ -d "examples" ]; then
             sqlfluff lint --dialect snowflake examples/migrations/
-            
+
             # Test rendering examples
             for file in examples/migrations/*.sql; do
               echo "Testing render for $file"
@@ -152,11 +155,11 @@ jobs:
           import subprocess
           import sys
           from pathlib import Path
-          
+
           def test_file_compatibility(sql_file):
               """Test that SQLFluff and schemachange produce similar template parsing."""
               print(f"Testing compatibility for {sql_file}")
-              
+
               # Test SQLFluff render
               try:
                   result = subprocess.run([
@@ -169,22 +172,22 @@ jobs:
               except Exception as e:
                   print(f"  SQLFluff: ✗ (Exception: {e})")
                   sqlfluff_success = False
-              
+
               return sqlfluff_success
-          
+
           if __name__ == "__main__":
               examples_dir = Path("examples/migrations")
               if examples_dir.exists():
                   sql_files = list(examples_dir.glob("*.sql"))
                   total_files = len(sql_files)
                   successful_files = 0
-                  
+
                   for sql_file in sql_files:
                       if test_file_compatibility(sql_file):
                           successful_files += 1
-                  
+
                   print(f"\nSummary: {successful_files}/{total_files} files processed successfully")
-                  
+
                   if successful_files == total_files:
                       print("✓ All files compatible!")
                       sys.exit(0)
@@ -195,7 +198,7 @@ jobs:
                   print("No examples directory found")
                   sys.exit(1)
           EOF
-          
+
           python compare_outputs.py
 
   security:
@@ -274,7 +277,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ['3.8', '3.11']
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -298,7 +301,7 @@ jobs:
           # Create minimal test case
           mkdir -p test_integration
           cd test_integration
-          
+
           # Create config files
           echo '[sqlfluff]' > .sqlfluff
           echo 'templater = schemachange' >> .sqlfluff
@@ -306,14 +309,14 @@ jobs:
           echo '' >> .sqlfluff
           echo '[sqlfluff:templater:schemachange]' >> .sqlfluff
           echo 'config_folder = .' >> .sqlfluff
-          
+
           echo 'config-version: 1' > schemachange-config.yml
           echo 'vars:' >> schemachange-config.yml
           echo '  test_var: "test_value"' >> schemachange-config.yml
-          
+
           # Create test SQL
           echo 'SELECT {{ test_var }} as test_column;' > test.sql
-          
+
           # Test SQLFluff
           sqlfluff lint test.sql
           sqlfluff render test.sql
@@ -322,10 +325,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.9'
         run: |
           python test_generator.py
-          
+
           # Test a few key examples
           cd temp/basic
           sqlfluff lint test.sql --dialect snowflake
-          
+
           cd ../advanced
           sqlfluff lint migrations/ --dialect snowflake

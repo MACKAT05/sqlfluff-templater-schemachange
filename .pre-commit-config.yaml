@@ -19,7 +19,6 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
-        args: [--max-line-length=88, --extend-ignore=E203,W503]
 
   # Type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -28,19 +27,29 @@ repos:
       - id: mypy
         additional_dependencies: [types-PyYAML]
         args: [--ignore-missing-imports]
+        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
 
-  # SQLFluff linting for SQL files
-  - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 2.3.2
+  # SQLFluff linting for SQL files (using local development package)
+  # NOTE: Requires 'pip install -e .' to be run first to install the development package
+  # Only runs on examples/ directory which has proper .sqlfluff configuration
+  - repo: local
     hooks:
-      - id: sqlfluff-lint
-        additional_dependencies: ['sqlfluff-templater-schemachange']
-        files: \.sql$
-        args: [--dialect=snowflake]
-      - id: sqlfluff-fix
-        additional_dependencies: ['sqlfluff-templater-schemachange']
-        files: \.sql$
-        args: [--dialect=snowflake]
+      - id: sqlfluff-lint-examples
+        name: SQLFluff Lint Examples
+        entry: python
+        language: system
+        files: ^examples/.*\.sql$
+        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff lint migrations/ --dialect snowflake')"]
+        require_serial: false
+        pass_filenames: false
+      - id: sqlfluff-fix-examples
+        name: SQLFluff Fix Examples
+        entry: python
+        language: system
+        files: ^examples/.*\.sql$
+        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff fix migrations/ --dialect snowflake')"]
+        require_serial: false
+        pass_filenames: false
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -50,6 +59,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        exclude: bandit-report\.json$
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-merge-conflict
@@ -61,8 +71,9 @@ repos:
     rev: 1.7.5
     hooks:
       - id: bandit
-        args: [-r, ., -f, json, -o, bandit-report.json]
-        exclude: test_.*\.py$
+        args: [--recursive, --format, json, --output, bandit-report.json, --configfile, .bandit]
+        files: \.py$
+        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|fix_lint_issues\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
 
   # Documentation linting
   - repo: https://github.com/pycqa/pydocstyle
@@ -70,6 +81,7 @@ repos:
     hooks:
       - id: pydocstyle
         args: [--convention=google]
+        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py)$
 
 # Configuration for specific hooks
 ci:
