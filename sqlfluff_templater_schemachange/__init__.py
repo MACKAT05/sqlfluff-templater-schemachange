@@ -9,5 +9,5 @@ __all__ = ["SchemachangeTemplater"]
 
 @hookimpl
 def get_templaters():
-    """Return the list of templaters provided by this plugin."""
+    """Return the list of templaters provided by this plugin.""" 
     return [SchemachangeTemplater]

@@ -1,7 +1,6 @@
 # Core dependencies
 sqlfluff>=2.0.0
-Jinja2>=3.0.0
-PyYAML>=5.4.0
+schemachange>=4.0.0
 
 # Development dependencies (optional)
 pytest>=6.0.0

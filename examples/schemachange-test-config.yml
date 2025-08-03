@@ -1,0 +1,16 @@
+# Schemachange configuration for testing the SQLFluff templater
+# This file provides the template variables used in the test SQL files
+
+vars:
+  database_name: "MY_DATABASE"
+  schema_name: "ANALYTICS" 
+  table_name: "customers"
+  state_filter: "CA"
+  start_date: "2023-01-01"
+  environment: "DEV"
+  
+# Additional schemachange settings
+config-folder: "."
+root-folder: "."
+modules-folder: "."
+create-change-history-table: false

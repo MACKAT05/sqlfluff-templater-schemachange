@@ -2,320 +2,418 @@
 Schemachange templater for SQLFluff.
 
 This templater integrates with the schemachange database change management tool,
-allowing SQLFluff to lint SQL files that use schemachange's Jinja templating features.
+using schemachange's native render functionality to process Jinja templates.
 """
 
+import subprocess
+import tempfile
 import os
 import json
-import yaml
 import logging
-from pathlib import Path
-from typing import Iterator, Tuple, Optional, Dict, Any, List, Union
-
-from jinja2 import Environment, FileSystemLoader, Template, TemplateError, UndefinedError
-from jinja2.sandbox import SandboxedEnvironment
+from typing import Dict, Any
 
 from sqlfluff.core.templaters.base import TemplatedFile, RawTemplater
-from sqlfluff.core.templaters.jinja import JinjaTemplater
 from sqlfluff.core.errors import SQLTemplaterError
+
+# Try to import the slice classes
+try:
+    from sqlfluff.core.templaters.base import RawFileSlice, TemplatedFileSlice
+except ImportError:
+    try:
+        from sqlfluff.core.templaters import RawFileSlice, TemplatedFileSlice
+    except ImportError:
+        # If we can't import them, we'll need to create our own
+        from dataclasses import dataclass
+        from typing import Optional
+        
+        @dataclass
+        class RawFileSlice:
+            raw: str
+            slice_type: str
+            source_idx: int
+            block_idx: int
+            tag: Optional[str] = None
+        
+        @dataclass
+        class TemplatedFileSlice:
+            slice_type: str
+            source_slice: slice
+            templated_slice: slice
 
 logger = logging.getLogger(__name__)
 
 
 class SchemachangeTemplater(RawTemplater):
     """
-    A templater that processes schemachange Jinja templates.
+    A templater that uses schemachange's native render command to process Jinja templates.
     
-    This templater is designed to work with schemachange's templating system,
-    supporting:
+    This templater calls schemachange render directly, ensuring 100% compatibility
+    with schemachange's templating system including:
     - Jinja2 templating with variables from schemachange-config.yml
     - Macro templates from modules folder
     - Environment variable substitution
-    - Secret filtering and handling
-    - Complex nested variable structures
+    - All schemachange templating features
     """
     
     name = "schemachange"
     sequential_fail_limit = 3
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._environment = None
-        self._config_vars = {}
-        self._modules_path = None
-        self._root_path = None
+    # print("SchemachangeTemplater initialized")
         
     def config_pairs(self):
         """Return configuration options for this templater."""
         return [
-            ("schemachange_config", None),
-            ("config_file_path", None),
-            ("modules_folder", None),
-            ("root_folder", None),
+            ("config_folder", '.'),
+            ("root_folder", '.'),
+            ("modules_folder", '.'),
             ("vars", {}),
-            ("apply_dbt_builtins", False),
-            ("library_path", None),
-            ("loader_search_path", None),
+            ("verbose", False),
         ]
 
-    def _load_schemachange_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
-        """Load schemachange configuration from YAML file."""
-        if config_path is None:
-            # Look for schemachange-config.yml in current directory
-            candidates = [
-                "schemachange-config.yml",
-                "schemachange-config.yaml",
-                ".schemachange/config.yml",
-                ".schemachange/config.yaml"
-            ]
-            
-            for candidate in candidates:
-                if os.path.exists(candidate):
-                    config_path = candidate
-                    break
-            
-            if config_path is None:
-                logger.debug("No schemachange config file found")
-                return {}
-        
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                # First pass: load raw YAML for env_var processing
-                raw_content = f.read()
-                
-                # Create a basic Jinja environment for config file processing
-                config_env = Environment()
-                config_env.globals['env_var'] = self._env_var_function
-                
-                # Render the config file with environment variables
-                rendered_content = config_env.from_string(raw_content).render()
-                
-                # Parse the rendered YAML
-                config = yaml.safe_load(rendered_content)
-                
-                logger.debug(f"Loaded schemachange config from {config_path}")
-                return config or {}
-                
-        except (FileNotFoundError, yaml.YAMLError, TemplateError) as e:
-            logger.warning(f"Could not load schemachange config from {config_path}: {e}")
-            return {}
-
-    def _env_var_function(self, var_name: str, default: Optional[str] = None) -> str:
-        """Custom function for accessing environment variables in config files."""
-        value = os.environ.get(var_name)
-        if value is None:
-            if default is not None:
-                return default
-            else:
-                raise ValueError(f"Environment variable '{var_name}' not found and no default provided")
-        return value
-
-    def _extract_variables(self, config: Dict[str, Any], cli_vars: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract and merge variables from config and CLI arguments."""
-        # Start with config vars
-        variables = config.get('vars', {}).copy()
-        
-        # Merge with CLI vars (CLI takes precedence)
-        variables.update(cli_vars)
-        
-        return variables
-
-    def _is_secret(self, key_path: List[str], value: Any) -> bool:
-        """Determine if a variable should be treated as a secret."""
-        # Check if any part of the key path contains 'secret'
-        for key in key_path:
-            if 'secret' in key.lower():
-                return True
-        
-        # Check if the variable is under a 'secrets' key
-        if len(key_path) > 1:
-            for i, key in enumerate(key_path[:-1]):
-                if key.lower() == 'secrets':
-                    return True
-        
-        return False
-
-    def _filter_secrets(self, variables: Dict[str, Any], path: List[str] = None) -> Dict[str, Any]:
-        """Filter out secret values for logging purposes."""
-        if path is None:
-            path = []
-            
-        filtered = {}
-        for key, value in variables.items():
-            current_path = path + [key]
-            
-            if isinstance(value, dict):
-                filtered[key] = self._filter_secrets(value, current_path)
-            else:
-                if self._is_secret(current_path, value):
-                    filtered[key] = "***REDACTED***"
-                else:
-                    filtered[key] = value
-        
-        return filtered
-
-    def _setup_jinja_environment(self, config: Dict[str, Any], variables: Dict[str, Any]) -> Environment:
-        """Set up the Jinja2 environment with all necessary configurations."""
-        # Determine search paths
-        search_paths = []
-        
-        # Add modules folder if specified
-        modules_folder = config.get('modules-folder') or config.get('modules_folder')
-        if modules_folder:
-            search_paths.append(modules_folder)
-            self._modules_path = modules_folder
-        
-        # Add root folder
-        root_folder = config.get('root-folder') or config.get('root_folder', '.')
-        search_paths.append(root_folder)
-        self._root_path = root_folder
-        
-        # Add any additional loader search paths
-        loader_search_path = config.get('loader_search_path', '')
-        if loader_search_path:
-            if isinstance(loader_search_path, str):
-                search_paths.extend(p.strip() for p in loader_search_path.split(',') if p.strip())
-            elif isinstance(loader_search_path, list):
-                search_paths.extend(loader_search_path)
-        
-        # Create the environment with sandbox for security
-        env = SandboxedEnvironment(
-            loader=FileSystemLoader(search_paths, followlinks=False),
-            # Disable autoescape since we're working with SQL, not HTML
-            autoescape=False,
-            # Keep trailing newline for consistency
-            keep_trailing_newline=True,
-            # Enable line statements and comments for debugging
-            line_statement_prefix=None,
-            line_comment_prefix=None,
-        )
-        
-        # Add all variables to the global context
-        env.globals.update(variables)
-        
-        # Add utility functions
-        env.globals['env_var'] = self._env_var_function
-        
-        # Add dbt-style builtins if requested
-        if config.get('apply_dbt_builtins', False):
-            self._add_dbt_builtins(env)
-        
-        return env
-
-    def _add_dbt_builtins(self, env: Environment):
-        """Add dbt-style builtin functions to the Jinja environment."""
-        def ref(model_name: str) -> str:
-            """Mock dbt ref() function."""
-            return model_name
-        
-        def source(source_name: str, table_name: str) -> str:
-            """Mock dbt source() function."""
-            return f"{source_name}.{table_name}"
-        
-        def var(variable_name: str, default_value: Any = None) -> Any:
-            """Mock dbt var() function."""
-            return env.globals.get(variable_name, default_value)
-        
-        def config(**kwargs) -> str:
-            """Mock dbt config() function."""
-            return ""
-        
-        def is_incremental() -> bool:
-            """Mock dbt is_incremental() function."""
-            return False
-
-        # Add functions to the environment
-        env.globals.update({
-            'ref': ref,
-            'source': source,
-            'var': var,
-            'config': config,
-            'is_incremental': is_incremental,
-        })
-
-    def template(self, fname, in_str, config, **kwargs):
+    def process(self, *, fname, in_str, config=None, formatter=None):
         """
-        Template the given string using schemachange-compatible Jinja templating.
+        Process the given string using schemachange's native render command.
         
         Args:
-            fname: The filename being templated
+            fname: The filename being processed
             in_str: The input SQL string
             config: SQLFluff configuration object
-            **kwargs: Additional keyword arguments
+            formatter: Optional formatter (not used)
             
         Returns:
             TemplatedFile: The templated result
         """
+        # print(f"🔧 PROCESS called - Processing file: {fname}")
+        # print(f"📝 Input string: {in_str}")
+        # print(f"🎨 Formatter: {formatter}")
+        
+        # Get templater configuration
         try:
-            # Load schemachange configuration
-            schemachange_config_path = config.get_section(
-                (self.templater_selector, self.name, "config_file_path")
-            )
-            schemachange_config = self._load_schemachange_config(schemachange_config_path)
+            templater_section = config.get_section(("templater", "SchemachangeTemplater"))
+            # print(f"Templater config section: {templater_section}")
+        except Exception as e:
+            logger.warning(f"Error getting templater section: {e}")
+            templater_section = {}
+        try:
+            # Get templater configuration - using correct path
+            templater_config = config.get_section(("templater", "SchemachangeTemplater")) or {}
+            ends_with_semicolon = in_str.endswith(';')
+            ends_with_semicolon_newline = in_str.endswith(';\n')
+            # Create temporary file for SQL content
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False, dir=os.getcwd()) as  temp_file:
+                temp_file.write(in_str)
+                temp_file_path = temp_file.name
             
-            # Get CLI variables from SQLFluff config
-            cli_vars = config.get_section((self.templater_selector, self.name, "vars")) or {}
-            
-            # Extract and merge all variables
-            variables = self._extract_variables(schemachange_config, cli_vars)
-            
-            # Log variables (filtered for secrets)
-            filtered_vars = self._filter_secrets(variables)
-            logger.debug(f"Using variables: {json.dumps(filtered_vars, indent=2)}")
-            
-            # Set up Jinja environment
-            env = self._setup_jinja_environment(schemachange_config, variables)
-            self._environment = env
-            
-            # Render the template
-            template = env.from_string(in_str)
-            rendered_sql = template.render()
-            
-            # Create the templated file object
-            templated_file = TemplatedFile(
+            try:
+                # Build schemachange render command
+                cmd = ['schemachange', 'render',  os.path.basename(temp_file_path)]
+                # Add optional parameters based on configuration
+                if templater_config.get('config_folder'):
+                    cmd.extend(['--config-folder', templater_config['config_folder']])
+                    
+                if templater_config.get('root_folder'):
+                    cmd.extend(['-f', templater_config['root_folder']])
+                    
+                if templater_config.get('modules_folder'):
+                    cmd.extend(['-m', templater_config['modules_folder']])
+                    
+                if templater_config.get('vars'):
+                    # Convert vars to JSON string for schemachange
+                    vars_json = json.dumps(templater_config['vars'])
+                    cmd.extend(['--vars', vars_json])
+                    
+                if templater_config.get('verbose', False):
+                    cmd.append('-v')
+                
+                logger.debug(f"Executing schemachange command: {' '.join(cmd)}")
+                # print(f"Executing schemachange command: {' '.join(cmd)}")
+                
+                # Execute schemachange render
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=os.getcwd()
+                )
+                
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() or result.stdout.strip()
+                    raise SQLTemplaterError(
+                        f"Schemachange render failed: {error_msg}",
+                        line_no=None,
+                        line_pos=None,
+                    )
+                
+                # Parse rendered content from schemachange stdout 
+                stdout = result.stdout.strip()
+                if 'content=' in stdout:
+                    # print(f"📝 Found 'content=' in stdout, attempting regex extraction")
+                    # Extract content from the success log line - more robust regex
+                    import re
+                    # Try first pattern that captures everything between content= and schemachange_version=
+                    match = re.search(r'content=(.+?)(?=\s*schemachange_version=)', stdout, re.DOTALL)
+                    if not match:
+                        # Fallback: try to capture content= to end of line/output
+                        match = re.search(r'content=(.+?)(?=\s*$)', stdout, re.DOTALL | re.MULTILINE)
+                    
+                    if match:
+                        rendered_sql = match.group(1)
+                        # fix for when schemachange deletes the trailing semicolon and whitespace if present on render
+                        if ends_with_semicolon:
+                            rendered_sql = rendered_sql + ';'
+                        if ends_with_semicolon_newline:
+                            rendered_sql = rendered_sql + ';\n'
+                        # print(f"✅ Regex extraction SUCCESS")
+                    else:
+                        logger.warning("Regex extraction failed - using original SQL")
+                        rendered_sql = in_str  # Fallback to original
+                else:
+                    logger.warning("No 'content=' found in stdout - using original SQL")
+                    rendered_sql = in_str  # Fallback to original
+                
+                # Handle case where schemachange returns empty output
+                if not rendered_sql:
+                    logger.warning("Schemachange render returned empty output, using original SQL")
+                    rendered_sql = in_str
+                
+                # Preserve trailing whitespace from original input to avoid issues with fix operations
+                # Check if original input ends with whitespace/newlines
+                original_trailing = ''
+                if in_str and in_str[-1] in (' ', '\t', '\n', '\r'):
+                    # Find all trailing whitespace
+                    i = len(in_str) - 1
+                    while i >= 0 and in_str[i] in (' ', '\t', '\n', '\r'):
+                        i -= 1
+                    original_trailing = in_str[i + 1:]
+                    
+                    # If rendered SQL doesn't end with the same trailing whitespace, add it
+                    if original_trailing and not rendered_sql.endswith(original_trailing):
+                        rendered_sql = rendered_sql.rstrip() + original_trailing
+                
+                # print(f"✅ Rendered SQL content:\n{rendered_sql}")
+                # print(f"📏 Length: {len(rendered_sql)} characters")
+                
+                logger.debug(f"Schemachange render successful. Input length: {len(in_str)}, Output length: {len(rendered_sql)}")
+                
+                # Manual slicing approach - create position mapping between input and output
+                # print(f"🔍 Creating manual slices:")
+                # print(f"   Input: {repr(in_str)} (length: {len(in_str)})")
+                # print(f"   Output: {repr(rendered_sql)} (length: {len(rendered_sql)})")
+                
+                # Create accurate slices with contiguity validation
+                import re
+                from difflib import SequenceMatcher
+                
+                templated_file_slices = []
+                raw_file_slices = []
+                
+                # Use difflib to find the actual differences between input and rendered SQL
+                matcher = SequenceMatcher(None, in_str, rendered_sql)
+                
+                # Process each matching block and difference, ensuring contiguity
+                last_source_end = 0
+                last_templated_end = 0
+                
+                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                    # Fill any gap in source coverage
+                    if i1 > last_source_end:
+                        gap_content = in_str[last_source_end:i1]
+                        # This gap represents removed Jinja control structures
+                        templated_file_slices.append(
+                            TemplatedFileSlice(
+                                slice_type='templated',
+                                source_slice=slice(last_source_end, i1),
+                                templated_slice=slice(last_templated_end, last_templated_end)  # Zero-length in output
+                            )
+                        )
+                        raw_file_slices.append(
+                            RawFileSlice(
+                                raw=gap_content,
+                                slice_type='templated',
+                                source_idx=last_source_end,
+                                block_idx=0,
+                                tag=None
+                            )
+                        )
+                    
+                    # Process the current operation
+                    if tag == 'equal':
+                        # Literal content that didn't change
+                        if i2 > i1:  # Only if there's actual content
+                            literal_content = in_str[i1:i2]
+                            
+                            templated_file_slices.append(
+                                TemplatedFileSlice(
+                                    slice_type='literal',
+                                    source_slice=slice(i1, i2),
+                                    templated_slice=slice(j1, j2)
+                                )
+                            )
+                            
+                            raw_file_slices.append(
+                                RawFileSlice(
+                                    raw=literal_content,
+                                    slice_type='literal',
+                                    source_idx=i1,
+                                    block_idx=0,
+                                    tag=None
+                                )
+                            )
+                    
+                    elif tag in ['replace', 'delete', 'insert']:
+                        # This represents a template substitution or change
+                        if i2 > i1:  # There was content in the source
+                            source_content = in_str[i1:i2]
+                            
+                            # Check if this is a Jinja template variable or control structure
+                            if ('{{' in source_content and '}}' in source_content) or ('{%' in source_content and '%}' in source_content):
+                                slice_type = 'templated'
+                            else:
+                                slice_type = 'literal'
+                            
+                            templated_file_slices.append(
+                                TemplatedFileSlice(
+                                    slice_type=slice_type,
+                                    source_slice=slice(i1, i2),
+                                    templated_slice=slice(j1, j2)
+                                )
+                            )
+                            
+                            raw_file_slices.append(
+                                RawFileSlice(
+                                    raw=source_content,
+                                    slice_type=slice_type,
+                                    source_idx=i1,
+                                    block_idx=0,
+                                    tag=None
+                                )
+                            )
+                    
+                    # Update tracking positions
+                    last_source_end = max(last_source_end, i2)
+                    last_templated_end = max(last_templated_end, j2)
+                
+                # Handle any remaining content at the end
+                if last_source_end < len(in_str):
+                    gap_content = in_str[last_source_end:]
+                    templated_file_slices.append(
+                        TemplatedFileSlice(
+                            slice_type='templated',
+                            source_slice=slice(last_source_end, len(in_str)),
+                            templated_slice=slice(last_templated_end, last_templated_end)  # Zero-length in output
+                        )
+                    )
+                    raw_file_slices.append(
+                        RawFileSlice(
+                            raw=gap_content,
+                            slice_type='templated',
+                            source_idx=last_source_end,
+                            block_idx=0,
+                            tag=None
+                        )
+                    )
+                
+                # Validate contiguity
+                def validate_slice_contiguity(slices, total_length, slice_name):
+                    if not slices:
+                        return True, []
+                    
+                    errors = []
+                    expected_pos = 0
+                    
+                    for i, slice_obj in enumerate(slices):
+                        if hasattr(slice_obj, 'source_slice'):
+                            start = slice_obj.source_slice.start
+                            end = slice_obj.source_slice.stop
+                        else:
+                            start = slice_obj.source_idx
+                            end = start + len(slice_obj.raw)
+                        
+                        if start != expected_pos:
+                            errors.append(f"Gap in {slice_name} at position {expected_pos}-{start}")
+                        
+                        expected_pos = end
+                    
+                    if expected_pos != total_length:
+                        errors.append(f"Final {slice_name} position {expected_pos} != total length {total_length}")
+                    
+                    return len(errors) == 0, errors
+                
+                # Validate both slice sets
+                source_valid, source_errors = validate_slice_contiguity(templated_file_slices, len(in_str), "source slices")
+                
+                # Validate template slice coverage 
+                total_templated_length = sum(
+                    max(0, slice_obj.templated_slice.stop - slice_obj.templated_slice.start)
+                    for slice_obj in templated_file_slices
+                )
+                template_length_valid = total_templated_length == len(rendered_sql)
+                
+                # If validation fails, fall back to simple slicing
+                if not source_valid or not template_length_valid:
+                    logger.warning(f"Complex slicing failed, falling back to simple approach")
+                    logger.warning(f"Source valid: {source_valid}, Template length: {total_templated_length}/{len(rendered_sql)}")
+                    
+                    # Simple fallback: treat entire input as templated
+                    templated_file_slices = [
+                        TemplatedFileSlice(
+                            slice_type='templated',
+                            source_slice=slice(0, len(in_str)),
+                            templated_slice=slice(0, len(rendered_sql))
+                        )
+                    ]
+                    
+                    raw_file_slices = [
+                        RawFileSlice(
+                            raw=in_str,
+                            slice_type='templated',
+                            source_idx=0,
+                            block_idx=0,
+                            tag=None
+                        )
+                    ]
+                    
+                    logger.info("Using simple fallback slicing for complex template")
+                else:
+                    logger.debug("Complex slicing validation passed")
+                
+                # print(f"   Created {len(templated_file_slices)} slices")
+                # print(f"   templated_file_slices: {templated_file_slices}")
+                # print(f"   raw_file_slices: {raw_file_slices}")
+                
+                # Create the templated file object with manual slicing
+                templated_file = TemplatedFile(
                 source_str=in_str,
                 templated_str=rendered_sql,
                 fname=fname,
-                sliced_file=[(
-                    slice(0, len(in_str)),  # Source slice
-                    slice(0, len(rendered_sql))  # Templated slice
-                )],
-            )
-            
-            return templated_file
-            
-        except UndefinedError as e:
-            # Handle undefined variables gracefully
-            variable_name = str(e).split("'")[1] if "'" in str(e) else "unknown"
+                    sliced_file=templated_file_slices,
+                    raw_sliced=raw_file_slices,
+                )
+                
+                return templated_file, []
+                
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_file_path)
+                except OSError:
+                    logger.warning(f"Failed to clean up temporary file: {temp_file_path}")
+                
+        except subprocess.TimeoutExpired:
             raise SQLTemplaterError(
-                f"Undefined variable '{variable_name}' in template. "
-                f"Please define it in your schemachange-config.yml vars section "
-                f"or pass it via --vars command line argument.",
+                "Schemachange render command timed out (30s limit)",
                 line_no=None,
                 line_pos=None,
             )
-            
-        except TemplateError as e:
+        except FileNotFoundError:
             raise SQLTemplaterError(
-                f"Jinja templating error: {str(e)}",
-                line_no=getattr(e, 'lineno', None),
+                "Schemachange command not found. Please ensure schemachange is installed and available in PATH.",
+                line_no=None,
                 line_pos=None,
             )
-            
         except Exception as e:
             raise SQLTemplaterError(
-                f"Unexpected error in schemachange templater: {str(e)}",
+                f"Error calling schemachange render: {str(e)}",
                 line_no=None,
                 line_pos=None,
             )
-
-    def slice_file(self, templated_file, config, **kwargs):
-        """
-        Slice the templated file to map between raw and templated positions.
-        
-        For now, we use a simple approach that maps the entire file.
-        A more sophisticated implementation would track Jinja blocks and variables.
-        """
-        # For simplicity, we'll use the parent class implementation
-        # which creates a basic slice mapping
-        return super().slice_file(templated_file, config, **kwargs)

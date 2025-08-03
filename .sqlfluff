@@ -3,8 +3,17 @@ dialect = snowflake
 templater = schemachange
 
 [sqlfluff:templater:schemachange]
-# Path to schemachange config file (optional)
-# config_file_path = schemachange-config.yml
+# Path to schemachange config folder (optional, defaults to current directory)
+config_folder = examples
 
-# Variables can be passed directly
+# Root folder for scripts (optional)
+root_folder = scripts
+
+# Modules folder for macros (optional)
+modules_folder = modules
+
+# Variables can be passed directly (JSON format)
 vars = {"database": "TEST_DB", "schema": "PUBLIC"}
+
+# Enable verbose output from schemachange
+verbose = false

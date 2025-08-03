@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: sqlfluff-templater-schemachange
 Version: 0.1.0
 Summary: A SQLFluff templater plugin for schemachange integration
@@ -21,6 +21,19 @@ Classifier: Topic :: Software Development :: Quality Assurance
 Classifier: Topic :: Database
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+Requires-Dist: sqlfluff>=2.0.0
+Requires-Dist: schemachange>=4.0.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: project-url
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
 
 # SQLFluff Templater for Schemachange
 
@@ -33,7 +46,6 @@ A custom SQLFluff templater that integrates with [schemachange](https://github.c
 - **Variable Management**: Supports complex nested variables and environment variable substitution
 - **Secret Filtering**: Automatically filters sensitive variables from logs
 - **Modules Support**: Load common templates and macros from a modules folder
-- **dbt Compatibility**: Optional dbt-style builtin functions (`ref()`, `source()`, `var()`, etc.)
 - **Environment Variables**: Support for `env_var()` function in config files
 
 ## Installation

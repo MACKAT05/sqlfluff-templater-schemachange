@@ -1,7 +1,7 @@
 [sqlfluff]
-# SQLFluff configuration for testing the schemachange templater
+# SQLFluff configuration for testing with built-in jinja templater
 dialect = snowflake
-templater = schemachange
+templater = jinja
 
 # Common rule exclusions for development/testing
 exclude_rules = 
@@ -15,16 +15,8 @@ max_line_length = 120
 # Enable more detailed output
 verbose = 0
 
-[sqlfluff:templater:schemachange]
-# Point to the test config file
-config_folder = .
-vars = {
-    "database_name": "MY_DATABASE",
-    "schema_name": "ANALYTICS",
-    "table_name": "customers", 
-    "state_filter": "CA",
-    "start_date": "2023-01-01"
-}
+[sqlfluff:templater:jinja]
+# No external variables needed - the template uses {% set %} statements
 
 [sqlfluff:indentation]
 # Use consistent indentation

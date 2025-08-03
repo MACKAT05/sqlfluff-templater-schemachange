@@ -9,7 +9,6 @@ A custom SQLFluff templater that integrates with [schemachange](https://github.c
 - **Variable Management**: Supports complex nested variables and environment variable substitution
 - **Secret Filtering**: Automatically filters sensitive variables from logs
 - **Modules Support**: Load common templates and macros from a modules folder
-- **dbt Compatibility**: Optional dbt-style builtin functions (`ref()`, `source()`, `var()`, etc.)
 - **Environment Variables**: Support for `env_var()` function in config files
 
 ## Installation

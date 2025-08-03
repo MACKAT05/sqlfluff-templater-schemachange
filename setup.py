@@ -31,8 +31,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "sqlfluff>=2.0.0",
-        "Jinja2>=3.0.0",
-        "PyYAML>=5.4.0",
+        "schemachange>=4.0.0",
     ],
     entry_points={
         "sqlfluff": [
