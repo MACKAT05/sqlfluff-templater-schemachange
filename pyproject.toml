@@ -1,3 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqlfluff-templater-schemachange"
+version = "0.1.0"
+description = "A standalone SQLFluff templater providing schemachange-compatible Jinja templating without schemachange dependency"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    { name = "Thomas MacKay", email = "mackay.thomas@gmail.com" }
+]
+maintainers = [
+    { name = "Thomas MacKay", email = "mackay.thomas@gmail.com" }
+]
+keywords = ["sqlfluff", "templater", "schemachange", "snowflake", "database", "linting"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Database",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "sqlfluff>=2.0.0",
+    "PyYAML>=5.1",
+    "jinja2>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MACKAT05/sqlfluff-templater-schemachange"
+Documentation = "https://github.com/MACKAT05/sqlfluff-templater-schemachange"
+Repository = "https://github.com/MACKAT05/sqlfluff-templater-schemachange"
+"Bug Reports" = "https://github.com/MACKAT05/sqlfluff-templater-schemachange/issues"
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "mypy>=0.950",
+    "bandit>=1.7.0",
+    "pytest>=7.0.0",
+    "pre-commit>=2.20.0",
+]
+
+[project.scripts]
+sqlfluff-templater-schemachange = "sqlfluff_templater_schemachange:main"
+
+[tool.setuptools.packages.find]
+include = ["sqlfluff_templater_schemachange*"]
+
+[project.entry-points."sqlfluff"]
+sqlfluff_templater_schemachange = "sqlfluff_templater_schemachange"
+
 [tool.black]
 line-length = 88
 target-version = ['py38']

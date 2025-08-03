@@ -1,2 +1,5 @@
+[console_scripts]
+sqlfluff-templater-schemachange = sqlfluff_templater_schemachange:main
+
 [sqlfluff]
 sqlfluff_templater_schemachange = sqlfluff_templater_schemachange

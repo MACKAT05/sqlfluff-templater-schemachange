@@ -1,7 +1,9 @@
+LICENSE
 README.md
-setup.py
+pyproject.toml
+setup.cfg
 sqlfluff_templater_schemachange/__init__.py
-sqlfluff_templater_schemachange/templater.py
+sqlfluff_templater_schemachange/sqlfluff-templater-schemachange.py
 sqlfluff_templater_schemachange.egg-info/PKG-INFO
 sqlfluff_templater_schemachange.egg-info/SOURCES.txt
 sqlfluff_templater_schemachange.egg-info/dependency_links.txt

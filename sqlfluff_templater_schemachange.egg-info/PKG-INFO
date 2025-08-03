@@ -1,13 +1,15 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: sqlfluff-templater-schemachange
 Version: 0.1.0
 Summary: A standalone SQLFluff templater providing schemachange-compatible Jinja templating without schemachange dependency
-Home-page: https://github.com/MACKAT05/sqlfluff-templater-schemachange
-Author: Thomas MacKay
-Author-email: mackay.thomas@gmail.com
+Author-email: Thomas MacKay <mackay.thomas@gmail.com>
+Maintainer-email: Thomas MacKay <mackay.thomas@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/MACKAT05/sqlfluff-templater-schemachange
+Project-URL: Documentation, https://github.com/MACKAT05/sqlfluff-templater-schemachange
+Project-URL: Repository, https://github.com/MACKAT05/sqlfluff-templater-schemachange
 Project-URL: Bug Reports, https://github.com/MACKAT05/sqlfluff-templater-schemachange/issues
-Project-URL: Source, https://github.com/MACKAT05/sqlfluff-templater-schemachange
-Keywords: sqlfluff templater schemachange snowflake database linting
+Keywords: sqlfluff,templater,schemachange,snowflake,database,linting
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
@@ -21,6 +23,18 @@ Classifier: Topic :: Software Development :: Quality Assurance
 Classifier: Topic :: Database
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: sqlfluff>=2.0.0
+Requires-Dist: PyYAML>=5.1
+Requires-Dist: jinja2>=3.0.0
+Provides-Extra: dev
+Requires-Dist: black>=22.0.0; extra == "dev"
+Requires-Dist: isort>=5.0.0; extra == "dev"
+Requires-Dist: mypy>=0.950; extra == "dev"
+Requires-Dist: bandit>=1.7.0; extra == "dev"
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pre-commit>=2.20.0; extra == "dev"
+Dynamic: license-file
 
 # SQLFluff Templater for Schemachange
 
@@ -458,7 +472,10 @@ python test_generator.py
    # Generate fresh test examples
    python test_generator.py
 
-   # Run comprehensive tests
+   # Run comprehensive tests on generated scenarios
+   python test_scenario_runner.py
+
+   # Run full cross-platform testing
    python setup_test_environments.py
 
    # Test SQLFluff integration
