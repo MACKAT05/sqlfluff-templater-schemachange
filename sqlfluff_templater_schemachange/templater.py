@@ -1,11 +1,11 @@
 """
-Schemachange templater for SQLFluff.
+Schemachange-compatible templater for SQLFluff.
 
-This templater integrates with the schemachange database change management tool,
-extending SQLFluff's JinjaTemplater to add schemachange-specific functionality:
-- Reads variables and macros from schemachange config files
-- Adds schemachange's env_var() function
-- Supports schemachange's macro loading from modules folder
+This templater provides standalone schemachange-compatible functionality by
+extending SQLFluff's JinjaTemplater (no schemachange dependency required):
+- Reads variables and macros from schemachange-config.yml files
+- Provides schemachange-compatible env_var() function
+- Supports schemachange-style macro loading from modules folder
 """
 
 import os
@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from jinja2 import FileSystemLoader, Environment
 from sqlfluff.core.templaters.jinja import JinjaTemplater
 from sqlfluff.core.errors import SQLTemplaterError
 
@@ -90,13 +91,25 @@ class SchemachangeTemplater(JinjaTemplater):
                 logger.debug(f"Could not get templater config for context: {e}")
         
         if 'vars' in templater_config:
-            context.update(templater_config['vars'])
+            template_vars = templater_config['vars']
+            if isinstance(template_vars, dict):
+                context.update(template_vars)
+            elif isinstance(template_vars, str):
+                # Handle string representation of JSON
+                try:
+                    parsed_vars = json.loads(template_vars)
+                    if isinstance(parsed_vars, dict):
+                        context.update(parsed_vars)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Could not parse vars as JSON: {e}")
+            else:
+                logger.warning(f"Unexpected vars type: {type(template_vars)}")
         
         logger.debug(f"Built context with {len(context)} variables")
         return context
     
     def _get_env_var(self, var_name: str, default_value: str = '') -> str:
-        """Schemachange-compatible env_var function."""
+        """Schemachange-compatible env_var function.  (not imported from schemachange)"""
         return os.environ.get(var_name, default_value)
     
     def _get_jinja_env(self, config=None, **kwargs):
@@ -122,14 +135,28 @@ class SchemachangeTemplater(JinjaTemplater):
         # Set up macro loading from modules folder
         modules_folder = templater_config.get('modules_folder') or schemachange_config.get('modules_folder')
         if modules_folder and Path(modules_folder).exists():
-            # Add modules folder to Jinja loader search path
+            # Set up proper FileSystemLoader for templates
+            search_paths = ['.', modules_folder]  # Current directory and modules folder
+            
             current_loader = env.loader
             if hasattr(current_loader, 'searchpath'):
-                if modules_folder not in current_loader.searchpath:
-                    current_loader.searchpath.append(modules_folder)
+                # If we already have a filesystem loader, add to its search path
+                for path in search_paths:
+                    if path not in current_loader.searchpath:
+                        current_loader.searchpath.append(path)
+            else:
+                # Create a new FileSystemLoader
+                env.loader = FileSystemLoader(search_paths)
+            
             logger.debug(f"Added modules folder to Jinja loader: {modules_folder}")
+        else:
+            # Even if no modules folder, ensure we have a basic loader for current directory
+            if not env.loader or not hasattr(env.loader, 'searchpath'):
+                env.loader = FileSystemLoader(['.'])
+                logger.debug("Set up basic FileSystemLoader for current directory")
         
         # Add schemachange-specific functions to Jinja environment
+        # if schemachange adds more functions we may need to add a dependancy to track future changes.
         env.globals['env_var'] = self._get_env_var
         
         # Add context variables to environment globals

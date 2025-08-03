@@ -1,6 +1,8 @@
 # SQLFluff Schemachange Templater - Complete Usage Guide
 
-This guide provides step-by-step instructions for using the SQLFluff Schemachange Templater to lint SQL files that use schemachange's Jinja templating features.
+This guide provides step-by-step instructions for using the SQLFluff Schemachange Templater to lint SQL files that use schemachange-compatible Jinja templating features.
+
+> **Important**: This templater provides a standalone implementation of schemachange's templating features. It does **not** require or import the schemachange package - it reads `schemachange-config.yml` files directly and replicates the same Jinja environment.
 
 ## Quick Start
 
@@ -26,7 +28,8 @@ templater = schemachange
 dialect = snowflake
 
 [sqlfluff:templater:schemachange]
-apply_dbt_builtins = true
+config_folder = .
+modules_folder = modules
 ```
 
 Create a `schemachange-config.yml` file:
@@ -76,19 +79,15 @@ The schemachange templater integrates with SQLFluff's templating system by:
 ```ini
 [sqlfluff:templater:schemachange]
 # Path to schemachange config (auto-discovered if not specified)
-config_file_path = schemachange-config.yml
+config_file = schemachange-config.yml
 
 # Additional variables (merged with config file vars)  
 vars = {"debug_mode": true, "linting": true}
 
-# Enable dbt-style builtin functions
-apply_dbt_builtins = true
 
 # Additional template search paths
-loader_search_path = templates,macros,shared
+modules_folder = templates
 
-# Library path for custom Python functions
-library_path = python_libs
 ```
 
 ### Schemachange Config Features
@@ -159,17 +158,6 @@ CREATE TABLE users (
 );
 ```
 
-### 3. dbt-Style Functions
-
-With `apply_dbt_builtins = true`:
-
-```sql
--- Use dbt-style functions
-SELECT * FROM {{ ref('staging_table') }};
-SELECT * FROM {{ source('raw_data', 'events') }};
-SELECT * FROM users WHERE status = '{{ var("user_status", "active") }}';
-```
-
 ### 4. Conditional Logic
 
 ```sql
@@ -214,14 +202,16 @@ CREATE TABLE {{ table_name }} (
 **Development** (`.sqlfluff`):
 ```ini
 [sqlfluff:templater:schemachange]
-config_file_path = configs/dev.yml
+config_folder = configs
+config_file = dev.yml
 vars = {"environment": "dev", "debug": true}
 ```
 
 **Production** (CI/CD):
 ```ini
 [sqlfluff:templater:schemachange]  
-config_file_path = configs/prod.yml
+config_folder = configs
+config_file = prod.yml
 vars = {"environment": "prod", "debug": false}
 ```
 
@@ -349,7 +339,7 @@ The templater caches Jinja environments and templates. For large projects:
 ```ini
 [sqlfluff:templater:schemachange]
 # Limit template search paths to improve performance
-loader_search_path = templates
+modules_folder = templates
 ```
 
 ### 2. Selective Linting

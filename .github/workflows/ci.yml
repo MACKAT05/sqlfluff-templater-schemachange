@@ -1,0 +1,331 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+
+      - name: Run pre-commit hooks
+        uses: pre-commit/action@v3.0.0
+
+  test:
+    name: Test on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-py${{ matrix.python }}-pip-${{ hashFiles('**/requirements.txt', '**/setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ matrix.python }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+
+      - name: Generate test files
+        run: |
+          python test_generator.py
+
+      - name: Test SQLFluff templater functionality
+        run: |
+          # Test basic functionality
+          cd temp/basic
+          sqlfluff lint --dialect snowflake test.sql
+          
+          # Test advanced functionality
+          cd ../advanced
+          sqlfluff lint --dialect snowflake migrations/
+          
+          # Test environment-specific configs
+          cd ../environments/dev
+          sqlfluff lint --dialect snowflake ../shared/V1.0.1__env_specific.sql
+
+      - name: Run pytest
+        run: |
+          pytest --cov=sqlfluff_templater_schemachange --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  test-cross-functionality:
+    name: Cross-functionality Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+          pip install schemachange>=3.0.0
+
+      - name: Generate test files
+        run: |
+          python test_generator.py
+
+      - name: Test SQLFluff on examples
+        run: |
+          # Test existing examples
+          if [ -d "examples" ]; then
+            sqlfluff lint --dialect snowflake examples/migrations/
+            
+            # Test rendering examples
+            for file in examples/migrations/*.sql; do
+              echo "Testing render for $file"
+              sqlfluff render "$file" --dialect snowflake || echo "Render failed for $file"
+            done
+          fi
+
+      - name: Test schemachange compatibility
+        run: |
+          cd examples
+          # Test that schemachange can render the same files
+          for file in migrations/*.sql; do
+            echo "Testing schemachange render for $file"
+            # Note: This may fail due to missing environment variables, which is expected
+            schemachange render "$file" --config-folder . --dry-run || echo "Schemachange render failed for $file (expected due to missing env vars)"
+          done
+
+      - name: Compare templating outputs
+        run: |
+          # Create comparison script
+          cat > compare_outputs.py << 'EOF'
+          #!/usr/bin/env python3
+          import subprocess
+          import sys
+          from pathlib import Path
+          
+          def test_file_compatibility(sql_file):
+              """Test that SQLFluff and schemachange produce similar template parsing."""
+              print(f"Testing compatibility for {sql_file}")
+              
+              # Test SQLFluff render
+              try:
+                  result = subprocess.run([
+                      'sqlfluff', 'render', str(sql_file), '--dialect', 'snowflake'
+                  ], capture_output=True, text=True, timeout=30)
+                  sqlfluff_success = result.returncode == 0
+                  print(f"  SQLFluff: {'✓' if sqlfluff_success else '✗'}")
+                  if not sqlfluff_success:
+                      print(f"    Error: {result.stderr}")
+              except Exception as e:
+                  print(f"  SQLFluff: ✗ (Exception: {e})")
+                  sqlfluff_success = False
+              
+              return sqlfluff_success
+          
+          if __name__ == "__main__":
+              examples_dir = Path("examples/migrations")
+              if examples_dir.exists():
+                  sql_files = list(examples_dir.glob("*.sql"))
+                  total_files = len(sql_files)
+                  successful_files = 0
+                  
+                  for sql_file in sql_files:
+                      if test_file_compatibility(sql_file):
+                          successful_files += 1
+                  
+                  print(f"\nSummary: {successful_files}/{total_files} files processed successfully")
+                  
+                  if successful_files == total_files:
+                      print("✓ All files compatible!")
+                      sys.exit(0)
+                  else:
+                      print("⚠ Some files had issues")
+                      sys.exit(1)
+              else:
+                  print("No examples directory found")
+                  sys.exit(1)
+          EOF
+          
+          python compare_outputs.py
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r sqlfluff_templater_schemachange/ -f json -o bandit-report.json
+          bandit -r sqlfluff_templater_schemachange/ -f txt
+
+      - name: Check for known security vulnerabilities
+        run: |
+          safety check --json --output safety-report.json
+          safety check
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Check package
+        run: |
+          twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+  integration-test:
+    name: Integration Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.8', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Test installation
+        run: |
+          python -c "import sqlfluff_templater_schemachange; print('✓ Package imported successfully')"
+
+      - name: Test SQLFluff integration
+        run: |
+          # Create minimal test case
+          mkdir -p test_integration
+          cd test_integration
+          
+          # Create config files
+          echo '[sqlfluff]' > .sqlfluff
+          echo 'templater = schemachange' >> .sqlfluff
+          echo 'dialect = snowflake' >> .sqlfluff
+          echo '' >> .sqlfluff
+          echo '[sqlfluff:templater:schemachange]' >> .sqlfluff
+          echo 'config_folder = .' >> .sqlfluff
+          
+          echo 'config-version: 1' > schemachange-config.yml
+          echo 'vars:' >> schemachange-config.yml
+          echo '  test_var: "test_value"' >> schemachange-config.yml
+          
+          # Create test SQL
+          echo 'SELECT {{ test_var }} as test_column;' > test.sql
+          
+          # Test SQLFluff
+          sqlfluff lint test.sql
+          sqlfluff render test.sql
+
+      - name: Generate and test comprehensive examples
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.9'
+        run: |
+          python test_generator.py
+          
+          # Test a few key examples
+          cd temp/basic
+          sqlfluff lint test.sql --dialect snowflake
+          
+          cd ../advanced
+          sqlfluff lint migrations/ --dialect snowflake

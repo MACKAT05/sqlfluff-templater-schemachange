@@ -1,0 +1,434 @@
+name: Scheduled Tests
+
+on:
+  schedule:
+    # Run tests daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      test_scope:
+        description: 'Test scope to run'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - 'full'
+          - 'compatibility'
+          - 'dependency'
+
+jobs:
+  dependency-check:
+    name: Check for Dependency Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install pip-tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-tools safety
+
+      - name: Check for security vulnerabilities
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check || echo "Security vulnerabilities found - check safety-report.json"
+
+      - name: Check for outdated dependencies
+        run: |
+          pip install -r requirements.txt
+          pip list --outdated --format=json > outdated-packages.json || true
+          
+          # Display outdated packages
+          echo "## Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json
+          try:
+              with open('outdated-packages.json') as f:
+                  packages = json.load(f)
+              if packages:
+                  print('| Package | Current | Latest |')
+                  print('|---------|---------|--------|')
+                  for pkg in packages:
+                      print(f'| {pkg[\"name\"]} | {pkg[\"version\"]} | {pkg[\"latest_version\"]} |')
+              else:
+                  print('All packages are up to date!')
+          except:
+              print('Could not check package versions')
+          "
+
+      - name: Upload dependency reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-reports
+          path: |
+            safety-report.json
+            outdated-packages.json
+
+  compatibility-matrix:
+    name: Extended Compatibility Matrix
+    runs-on: ${{ matrix.os }}
+    if: github.event.inputs.test_scope != 'dependency'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        sqlfluff: ['2.0.0', '2.1.0', '2.2.0', 'latest']
+        exclude:
+          # Exclude some combinations to reduce job count
+          - os: windows-latest
+            python: '3.8'
+          - os: macos-latest
+            python: '3.8'
+          - os: windows-latest
+            sqlfluff: '2.0.0'
+          - os: macos-latest
+            sqlfluff: '2.0.0'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          
+          # Install specific SQLFluff version
+          if [ "${{ matrix.sqlfluff }}" = "latest" ]; then
+            pip install sqlfluff
+          else
+            pip install sqlfluff==${{ matrix.sqlfluff }}
+          fi
+          
+          # Install other dependencies
+          pip install PyYAML>=5.1
+          pip install -e .
+
+      - name: Generate test files
+        run: |
+          python test_generator.py
+
+      - name: Test basic functionality
+        run: |
+          cd temp/basic
+          sqlfluff --version
+          sqlfluff lint test.sql --dialect snowflake
+
+      - name: Test advanced features
+        run: |
+          cd temp/advanced
+          sqlfluff lint migrations/ --dialect snowflake
+          
+          # Test rendering
+          for file in migrations/*.sql; do
+            echo "Testing $file"
+            sqlfluff render "$file" --dialect snowflake || echo "Render failed for $file"
+          done
+
+      - name: Report compatibility
+        if: always()
+        run: |
+          echo "## Compatibility Report" >> $GITHUB_STEP_SUMMARY
+          echo "- OS: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Python: ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SQLFluff: ${{ matrix.sqlfluff }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "- Status: ✅ Compatible" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Status: ❌ Issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  comprehensive-test:
+    name: Comprehensive Functionality Test
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_scope == 'full' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+          pip install schemachange>=3.0.0
+
+      - name: Run comprehensive test suite
+        run: |
+          python setup_test_environments.py
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: comprehensive-test-report
+          path: test_report.md
+
+      - name: Display test summary
+        if: always()
+        run: |
+          if [ -f "test_report.md" ]; then
+            echo "## Comprehensive Test Summary" >> $GITHUB_STEP_SUMMARY
+            head -20 test_report.md >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[Full Report](./test_report.md)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  performance-benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_scope == 'full' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements.txt
+          pip install pytest-benchmark
+
+      - name: Create performance test
+        run: |
+          cat > benchmark_test.py << 'EOF'
+          import pytest
+          import tempfile
+          from pathlib import Path
+          from sqlfluff_templater_schemachange.templater import SchemachangeTemplater
+          import yaml
+          
+          @pytest.fixture
+          def temp_config_dir():
+              with tempfile.TemporaryDirectory() as temp_dir:
+                  temp_path = Path(temp_dir)
+                  
+                  # Create config file
+                  config = {
+                      'config-version': 1,
+                      'vars': {
+                          'database_name': 'TEST_DB',
+                          'schema_name': 'TEST_SCHEMA',
+                          'table_prefix': 'test_'
+                      }
+                  }
+                  
+                  with open(temp_path / 'schemachange-config.yml', 'w') as f:
+                      yaml.dump(config, f)
+                  
+                  yield temp_path
+          
+          def test_template_loading_performance(benchmark, temp_config_dir):
+              """Benchmark template loading performance."""
+              templater = SchemachangeTemplater()
+              
+              def load_template():
+                  return templater._load_schemachange_config(str(temp_config_dir))
+              
+              result = benchmark(load_template)
+              assert result is not None
+          
+          def test_context_building_performance(benchmark, temp_config_dir):
+              """Benchmark context building performance."""
+              templater = SchemachangeTemplater()
+              config = templater._load_schemachange_config(str(temp_config_dir))
+              
+              def build_context():
+                  return templater._get_context_from_config(None, config)
+              
+              result = benchmark(build_context)
+              assert isinstance(result, dict)
+          
+          def test_large_template_performance(benchmark):
+              """Benchmark performance with large templates."""
+              templater = SchemachangeTemplater()
+              
+              # Create large template content
+              template_content = """
+              {% for i in range(1000) %}
+              CREATE TABLE {{ database_name }}.{{ schema_name }}.table_{{ i }} (
+                  id INTEGER,
+                  name VARCHAR(255),
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+              {% endfor %}
+              """
+              
+              config = {
+                  'vars': {
+                      'database_name': 'TEST_DB',
+                      'schema_name': 'TEST_SCHEMA'
+                  }
+              }
+              
+              def process_large_template():
+                  env = templater._get_jinja_env()
+                  env.globals.update(config['vars'])
+                  template = env.from_string(template_content)
+                  return template.render()
+              
+              result = benchmark(process_large_template)
+              assert 'CREATE TABLE' in result
+          EOF
+
+      - name: Run performance benchmarks
+        run: |
+          pytest benchmark_test.py --benchmark-json=benchmark.json --benchmark-sort=mean
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-benchmarks
+          path: benchmark.json
+
+      - name: Display benchmark summary
+        run: |
+          python -c "
+          import json
+          with open('benchmark.json') as f:
+              data = json.load(f)
+          
+          print('## Performance Benchmarks', file=open('benchmark_summary.md', 'w'))
+          print('', file=open('benchmark_summary.md', 'a'))
+          print('| Test | Mean Time | Std Dev |', file=open('benchmark_summary.md', 'a'))
+          print('|------|-----------|---------|', file=open('benchmark_summary.md', 'a'))
+          
+          for test in data['benchmarks']:
+              name = test['name'].replace('test_', '').replace('_', ' ').title()
+              mean = f\"{test['stats']['mean']:.4f}s\"
+              stddev = f\"{test['stats']['stddev']:.4f}s\"
+              print(f'| {name} | {mean} | {stddev} |', file=open('benchmark_summary.md', 'a'))
+          "
+          
+          cat benchmark_summary.md >> $GITHUB_STEP_SUMMARY
+
+  report-results:
+    name: Report Test Results
+    runs-on: ubuntu-latest
+    needs: [dependency-check, compatibility-matrix, comprehensive-test, performance-benchmark]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Generate final report
+        run: |
+          echo "# Scheduled Test Results - $(date)" > final_report.md
+          echo "" >> final_report.md
+          
+          echo "## Job Status Summary" >> final_report.md
+          echo "- Dependency Check: ${{ needs.dependency-check.result }}" >> final_report.md
+          echo "- Compatibility Matrix: ${{ needs.compatibility-matrix.result }}" >> final_report.md
+          echo "- Comprehensive Test: ${{ needs.comprehensive-test.result }}" >> final_report.md
+          echo "- Performance Benchmark: ${{ needs.performance-benchmark.result }}" >> final_report.md
+          echo "" >> final_report.md
+          
+          # Count successful vs failed jobs
+          success_count=0
+          total_count=4
+          
+          if [ "${{ needs.dependency-check.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
+          if [ "${{ needs.compatibility-matrix.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
+          if [ "${{ needs.comprehensive-test.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
+          if [ "${{ needs.performance-benchmark.result }}" = "success" ]; then success_count=$((success_count + 1)); fi
+          
+          echo "## Overall Status" >> final_report.md
+          echo "**$success_count/$total_count jobs completed successfully**" >> final_report.md
+          echo "" >> final_report.md
+          
+          if [ $success_count -eq $total_count ]; then
+            echo "🎉 All scheduled tests passed!" >> final_report.md
+          else
+            echo "⚠️ Some tests failed or were skipped. Please review the individual job results." >> final_report.md
+          fi
+
+      - name: Upload final report
+        uses: actions/upload-artifact@v3
+        with:
+          name: final-report
+          path: final_report.md
+
+      - name: Comment on latest commit (if failures)
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.sha;
+            
+            github.rest.repos.createCommitComment({
+              owner,
+              repo,
+              commit_sha: sha,
+              body: `
+              ⚠️ Scheduled tests failed for commit ${sha.substring(0, 7)}
+              
+              Some automated tests are failing. Please check the [workflow run](${context.payload.repository.url}/actions/runs/${context.runId}) for details.
+              
+              This may indicate:
+              - Dependency compatibility issues
+              - Regression in functionality
+              - Environmental changes
+              
+              Consider reviewing and fixing the issues before the next release.
+              `
+            });
+
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Delete old workflow runs
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Keep only the last 10 scheduled test runs
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'scheduled-tests.yml',
+              per_page: 100
+            });
+            
+            const runsToDelete = runs.data.workflow_runs.slice(10);
+            
+            for (const run of runsToDelete) {
+              if (run.status === 'completed') {
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id
+                  });
+                  console.log(`Deleted workflow run ${run.id}`);
+                } catch (error) {
+                  console.log(`Could not delete workflow run ${run.id}: ${error.message}`);
+                }
+              }
+            }

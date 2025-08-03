@@ -4,52 +4,53 @@ This directory contains example SQL files that demonstrate the SQLFluff schemach
 
 ## Files
 
-### Test SQL Files
-- `test_basic_templating.sql` - Basic template variable substitution
-- `test_formatting_rules.sql` - Spacing, indentation, and comma rules
-- `test_capitalization.sql` - Keyword and identifier capitalization  
-- `test_aliasing_references.sql` - Table aliasing and column reference rules
-- `test_comprehensive.sql` - Multiple template variables with various SQL issues
+### SQL Migration Files  
+- `migrations/V1.0.1__create_base_tables.sql` - Basic table creation with templating
+- `migrations/V1.0.2__create_advanced_tables.sql` - Advanced tables with complex Jinja logic
+- `migrations/R__create_views.sql` - Repeatable views with templated names
+
+### Template Files
+- `templates/audit_macros.sql` - Common audit column macros for reuse
 
 ### Configuration Files
 - `.sqlfluff` - SQLFluff configuration for these examples
-- `schemachange-test-config.yml` - Schemachange configuration with template variables
+- `schemachange-config.yml` - Schemachange configuration with template variables
 
 ## Usage
 
 ### Linting Examples
 ```bash
-# Lint a specific file
-sqlfluff lint test_basic_templating.sql --config .sqlfluff
+# Lint a specific migration file
+sqlfluff lint migrations/V1.0.1__create_base_tables.sql --config .sqlfluff
 
-# Lint all SQL files in the examples directory
-sqlfluff lint *.sql --config .sqlfluff
+# Lint all SQL files in the migrations directory
+sqlfluff lint migrations/ --config .sqlfluff
 
-# Get verbose output
-sqlfluff lint test_comprehensive.sql --config .sqlfluff -v
+# Get verbose output for complex templating
+sqlfluff lint migrations/V1.0.2__create_advanced_tables.sql --config .sqlfluff -v
 ```
 
 ### Fixing Examples
 ```bash
-# Fix formatting issues
-sqlfluff fix test_formatting_rules.sql --config .sqlfluff
+# Fix formatting issues in a migration
+sqlfluff fix migrations/V1.0.1__create_base_tables.sql --config .sqlfluff
 
 # See what would be fixed without applying changes
-sqlfluff fix test_capitalization.sql --config .sqlfluff --diff
+sqlfluff fix migrations/R__create_views.sql --config .sqlfluff --diff
 ```
 
 ### Testing the Templater
 ```bash
-# See the rendered SQL (what schemachange produces)
-schemachange render test_basic_templating.sql --config-folder .
+# Parse and see how templates are processed
+sqlfluff parse migrations/V1.0.1__create_base_tables.sql --config .sqlfluff
 
-# Compare with SQLFluff's parsing
-sqlfluff parse test_basic_templating.sql --config .sqlfluff
+# Test with different configurations
+sqlfluff lint migrations/ --config .sqlfluff --dialect snowflake
 ```
 
 ## Template Variables
 
-The examples use these template variables (defined in `schemachange-test-config.yml`):
+The examples use these template variables (defined in `schemachange-config.yml`):
 
 - `database_name` → `MY_DATABASE` 
 - `schema_name` → `ANALYTICS`

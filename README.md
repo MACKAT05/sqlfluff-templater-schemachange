@@ -1,15 +1,27 @@
 # SQLFluff Templater for Schemachange
 
-A custom SQLFluff templater that integrates with [schemachange](https://github.com/Snowflake-Labs/schemachange), enabling seamless SQL linting for files that use schemachange's Jinja templating features.
+A custom SQLFluff templater that provides **schemachange-compatible** Jinja templating features. This templater reads `schemachange-config.yml` files and provides the same templating experience as schemachange without requiring schemachange as a dependency.
+
+> **Note**: This is a **standalone implementation** that replicates schemachange's templating behavior within SQLFluff. It does **not** import or depend on the schemachange package itself.
 
 ## Features
 
-- **Schemachange Config Integration**: Automatically reads variables from `schemachange-config.yml`
-- **Jinja2 Templating**: Full support for Jinja2 templates including macros, includes, and inheritance
-- **Variable Management**: Supports complex nested variables and environment variable substitution
-- **Secret Filtering**: Automatically filters sensitive variables from logs
-- **Modules Support**: Load common templates and macros from a modules folder
-- **Environment Variables**: Support for `env_var()` function in config files
+- **Schemachange-Compatible Config**: Reads `schemachange-config.yml` files using the same format and structure
+- **Jinja2 Templating**: Full SQLFluff JinjaTemplater support with additional schemachange-style functions
+- **Variable Management**: Supports complex nested variables exactly like schemachange
+- **Environment Variables**: Provides `env_var()` function matching schemachange's implementation
+- **Modules Support**: Load templates and macros from folders (schemachange `modules-folder` equivalent)
+- **No External Dependencies**: Pure SQLFluff + PyYAML implementation, no schemachange package required
+
+## Why Use This?
+
+This templater is ideal when you want to:
+- **Lint schemachange SQL files** with SQLFluff's comprehensive rule set
+- **Use existing schemachange configs** without installing the full schemachange toolchain
+- **Integrate SQL linting** into CI/CD pipelines that use schemachange for deployments  
+- **Maintain consistency** between your schemachange templates and SQLFluff linting
+
+The templater replicates schemachange's Jinja environment and config parsing, so your templates work identically in both tools.
 
 ## Installation
 
@@ -20,7 +32,7 @@ pip install sqlfluff-templater-schemachange
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/sqlfluff-templater-schemachange
+git clone https://github.com/MACKAT05/sqlfluff-templater-schemachange
 cd sqlfluff-templater-schemachange
 pip install -e .
 ```
@@ -37,17 +49,17 @@ templater = schemachange
 dialect = snowflake
 
 [sqlfluff:templater:schemachange]
-# Path to schemachange config file (optional, auto-discovered by default)
-config_file_path = schemachange-config.yml
+# Path to schemachange config folder (optional, defaults to '.')
+config_folder = .
+
+# Schemachange config file name (optional, defaults to 'schemachange-config.yml')
+config_file = schemachange-config.yml
+
+# Modules folder for macro loading (optional)
+modules_folder = modules
 
 # Additional variables (merged with config file vars)
 vars = {"environment": "dev", "schema_suffix": "_DEV"}
-
-# Enable dbt-style builtin functions
-apply_dbt_builtins = true
-
-# Additional search paths for templates
-loader_search_path = templates,macros
 ```
 
 ### Schemachange Configuration
@@ -124,15 +136,7 @@ SELECT * FROM {{ sources.raw_database }}.PUBLIC.raw_data
 WHERE created_at >= '{{ start_date }}';
 ```
 
-### Environment Variable Integration
 
-```sql
--- Use environment-specific settings
-USE WAREHOUSE {{ env_var('SNOWFLAKE_WAREHOUSE', 'DEFAULT_WH') }};
-
--- Connect to environment-specific database  
-USE DATABASE {{ database_name }}_{{ environment | upper }};
-```
 
 ### Using Jinja Macros
 
@@ -163,22 +167,24 @@ CREATE TABLE {{ database_name }}.{{ generate_schema_name('analytics') }}.user_ev
 );
 ```
 
-### Using dbt-Style Functions
+### Environment Variable Integration
 
-When `apply_dbt_builtins = true`:
+Access environment variables using the `env_var()` function:
 
 ```sql
--- Use ref() function like in dbt
-SELECT * FROM {{ ref('staging_customers') }}
-WHERE status = 'active';
+-- Use environment variables with defaults
+USE WAREHOUSE {{ env_var('SNOWFLAKE_WAREHOUSE', 'DEFAULT_WH') }};
+USE DATABASE {{ env_var('DATABASE_NAME', database_name) }};
 
--- Use source() function
-SELECT * FROM {{ source('raw_data', 'customer_events') }}
-WHERE event_date >= '{{ start_date }}';
+-- Connect to environment-specific database  
+USE DATABASE {{ database_name }}_{{ env_var('ENVIRONMENT', 'dev') | upper }};
 
--- Use var() function with defaults
-SELECT * FROM events 
-WHERE event_type = '{{ var("event_filter", "click") }}';
+-- Use secrets from environment
+CREATE OR REPLACE EXTERNAL FUNCTION get_data(...)
+RETURNS VARIANT
+LANGUAGE PYTHON
+HANDLER='main'
+API_INTEGRATION = {{ env_var('API_INTEGRATION_NAME') }};
 ```
 
 ### Conditional Logic
@@ -269,12 +275,14 @@ You can have different configurations for different environments:
 **.sqlfluff** (development):
 ```ini
 [sqlfluff:templater:schemachange]
-config_file_path = configs/dev-config.yml
+config_folder = configs
+config_file = dev-config.yml
 vars = {"environment": "dev"}
 ```
 
 **configs/dev-config.yml**:
 ```yaml
+config-version: 1
 vars:
   database_name: 'DEV_DATABASE'
   environment: 'dev'
@@ -283,18 +291,23 @@ vars:
 
 **configs/prod-config.yml**:
 ```yaml
+config-version: 1
 vars:
   database_name: 'PROD_DATABASE'  
   environment: 'prod'
   debug_mode: false
 ```
 
-### Custom Search Paths
+### Macro Loading
+
+Configure macro loading from a modules folder:
 
 ```ini
 [sqlfluff:templater:schemachange]
-loader_search_path = templates,macros,includes,../shared-templates
+modules_folder = templates/macros
 ```
+
+This allows you to use `{% include %}` and `{% import %}` statements to load macros from the specified folder.
 
 ### Integration with CI/CD
 
