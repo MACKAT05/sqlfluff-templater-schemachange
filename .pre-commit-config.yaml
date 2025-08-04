@@ -86,6 +86,8 @@ repos:
         files: \.py$
         exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
+
+
   # Documentation linting
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0

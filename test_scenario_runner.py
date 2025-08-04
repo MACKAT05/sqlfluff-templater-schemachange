@@ -194,8 +194,12 @@ class TestScenarioRunner:
             print("Run 'python test_generator.py' first to generate test scenarios.")
             return
 
-        # Get all test directories
-        test_dirs = [d for d in self.temp_dir.iterdir() if d.is_dir()]
+        # Get all test directories (exclude existing_examples)
+        test_dirs = [
+            d
+            for d in self.temp_dir.iterdir()
+            if d.is_dir() and d.name != "existing_examples"
+        ]
 
         if not test_dirs:
             print("❌ No test directories found!")
@@ -265,7 +269,7 @@ class TestScenarioRunner:
 
         # Save detailed report
         report_path = Path("test_scenario_report.json")
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(self.results, f, indent=2, default=str)
 
         print(f"\n📄 Detailed report saved to: {report_path}")
@@ -309,7 +313,7 @@ class TestScenarioRunner:
                 report_lines.append("")
 
         report_path = Path("test_scenario_report.md")
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("\n".join(report_lines))
 
         print(f"📝 Markdown report saved to: {report_path}")
