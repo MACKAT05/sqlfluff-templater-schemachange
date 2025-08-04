@@ -1,0 +1,5 @@
+config-version: 1
+vars:
+  database_name: '{{ env_var("TEST_DB", "DEFAULT_DB") }}'
+  warehouse: '{{ env_var("SNOWFLAKE_WAREHOUSE", "DEFAULT_WH") }}'
+  environment: '{{ env_var("ENVIRONMENT", "dev") }}'

@@ -42,7 +42,7 @@ repos:
         entry: python
         language: system
         files: ^examples/.*\.sql$
-        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff lint migrations/ --dialect snowflake')"]
+        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff lint migrations/')"]
         require_serial: false
         pass_filenames: false
       - id: sqlfluff-fix-examples
@@ -50,7 +50,7 @@ repos:
         entry: python
         language: system
         files: ^examples/.*\.sql$
-        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff fix migrations/ --dialect snowflake')"]
+        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff fix migrations/ ')"]
         require_serial: false
         pass_filenames: false
 

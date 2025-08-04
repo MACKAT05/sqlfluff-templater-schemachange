@@ -1,0 +1,7 @@
+[sqlfluff]
+templater = schemachange
+dialect = snowflake
+
+[sqlfluff:templater:schemachange]
+config_file = schemachange-config.yml
+modules_folder = .\\templates

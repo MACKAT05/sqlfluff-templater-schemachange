@@ -263,7 +263,7 @@ jobs:
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
-        run: sqlfluff lint --dialect snowflake migrations/
+        run: sqlfluff lint  migrations/
 ```
 
 ## Troubleshooting
@@ -394,10 +394,10 @@ repos:
 **Makefile**:
 ```makefile
 lint-sql:
-	sqlfluff lint --dialect snowflake migrations/
+	sqlfluff lint migrations/
 
 fix-sql:
-	sqlfluff fix --dialect snowflake migrations/
+	sqlfluff fix migrations/
 
 check-sql: lint-sql
 	@echo "SQL linting complete"

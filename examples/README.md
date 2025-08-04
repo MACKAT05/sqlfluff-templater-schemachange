@@ -45,7 +45,7 @@ sqlfluff fix migrations/R__create_views.sql --config .sqlfluff --diff
 sqlfluff parse migrations/V1.0.1__create_base_tables.sql --config .sqlfluff
 
 # Test with different configurations
-sqlfluff lint migrations/ --config .sqlfluff --dialect snowflake
+sqlfluff lint migrations/ --config .sqlfluff
 ```
 
 ## Template Variables

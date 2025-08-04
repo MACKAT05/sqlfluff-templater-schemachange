@@ -1,0 +1,4 @@
+config-version: 1
+vars:
+  environment: '{{ env_var("ENVIRONMENT", "dev") }}'
+  debug_mode: '{{ env_var("DEBUG_MODE", "false") | bool }}'

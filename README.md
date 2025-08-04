@@ -336,7 +336,7 @@ jobs:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
         run: |
-          sqlfluff lint --dialect snowflake scripts/
+          sqlfluff lint scripts/
 ```
 
 ## Secret Handling
@@ -386,65 +386,56 @@ sqlfluff lint
 
 ### Development Setup
 
-The project includes a development setup script to handle the proper installation order:
+The project uses static tests for easy debugging and CI integration:
 
 ```bash
 # Clone the repository
 git clone https://github.com/MACKAT05/sqlfluff-templater-schemachange
 cd sqlfluff-templater-schemachange
 
-# Run the development setup script
-python dev-setup.py
-```
-
-This script will:
-1. Install the package in development mode
-2. Install all development dependencies
-3. Set up pre-commit hooks (requires development package to be installed first)
-4. Generate test examples
-5. Run basic functionality tests
-
-### Manual Development Setup
-
-If you prefer to set up manually:
-
-```bash
-# Install in development mode (critical - must be done first!)
+# Install in development mode
 pip install -e .
 
 # Install development dependencies
 pip install -r requirements.txt
 
-# Install pre-commit (after the package is installed)
+# Install pre-commit
 pip install pre-commit
 pre-commit install
+```
 
-# Generate test examples
-python test_generator.py
+The project includes static test files in the `tests/` directory for easy debugging and CI integration.
+
+### Testing
+
+The project includes static test files for easy debugging:
+
+```bash
+# Run all tests
+python tests/run_tests.py
+
+# Run individual tests
+python tests/test_basic.py
+python tests/test_modules.py
+python tests/test_env_vars.py
+python tests/test_conditional.py
 ```
 
 ### Development Workflow
 
 1. Fork the repository
 2. Create a feature branch
-3. Run the development setup: `python dev-setup.py`
-4. Make your changes
-5. Test your changes:
+3. Make your changes
+4. Test your changes:
    ```bash
-   # Generate fresh test examples
-   python test_generator.py
-
-   # Run comprehensive tests on generated scenarios
-   python test_scenario_runner.py
-
-   # Run full cross-platform testing
-   python setup_test_environments.py
+   # Run all tests
+   python tests/run_tests.py
 
    # Test SQLFluff integration
-   cd temp/basic && sqlfluff lint test.sql --dialect snowflake
+   cd tests/basic && sqlfluff render test.sql
    ```
-6. Pre-commit hooks will run automatically on `git commit`
-7. Submit a pull request
+5. Pre-commit hooks will run automatically on `git commit`
+6. Submit a pull request
 
 ### Note on Pre-commit
 

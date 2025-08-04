@@ -26,13 +26,13 @@ The CI tests focus on render functionality only, using `--config` to specify the
 
 ```bash
 # Basic test
-sqlfluff render --dialect snowflake --config .sqlfluff test.sql
+sqlfluff render test.sql
 
 # Advanced test with modules
-sqlfluff render --dialect snowflake --config .sqlfluff migrations/*.sql
+sqlfluff render migrations/*.sql
 
 # Examples test
-sqlfluff render --dialect snowflake --config examples/.sqlfluff examples/migrations/*.sql
+sqlfluff render --config examples/.sqlfluff examples/migrations/*.sql
 ```
 
 ### Test Coverage
