@@ -82,34 +82,40 @@ jobs:
            cd temp/basic
            echo "Testing render functionality for basic test..."
            sqlfluff render --dialect snowflake test.sql
-           echo "Testing linting (expected to have linting issues after rendering)..."
-           if sqlfluff lint --dialect snowflake test.sql; then
-             echo "Linting passed (no issues found)"
-           else
-             echo "Linting found issues (expected for test files)"
-           fi
+                       echo "Testing linting (expected to have linting issues after rendering)..."
+            if sqlfluff lint --dialect snowflake test.sql; then
+              echo "Linting passed (no issues found)"
+            else
+              echo "Linting found issues (expected for test files)"
+            fi
 
            # Test advanced functionality
            cd ../advanced
            echo "Testing render functionality for advanced test..."
-           sqlfluff render --dialect snowflake migrations/
-           echo "Testing linting (expected to have linting issues after rendering)..."
-           if sqlfluff lint --dialect snowflake migrations/; then
-             echo "Linting passed (no issues found)"
-           else
-             echo "Linting found issues (expected for test files)"
-           fi
+           # Render each SQL file in the migrations directory
+           for file in migrations/*.sql; do
+             if [ -f "$file" ]; then
+               echo "Rendering $file..."
+               sqlfluff render --dialect snowflake "$file"
+             fi
+           done
+                       echo "Testing linting (expected to have linting issues after rendering)..."
+            if sqlfluff lint --dialect snowflake migrations/; then
+              echo "Linting passed (no issues found)"
+            else
+              echo "Linting found issues (expected for test files)"
+            fi
 
            # Test environment-specific configs
            cd ../environments/dev
            echo "Testing render functionality for environment test..."
            sqlfluff render --dialect snowflake ../shared/V1.0.1__env_specific.sql
-           echo "Testing linting (expected to have linting issues after rendering)..."
-           if sqlfluff lint --dialect snowflake ../shared/V1.0.1__env_specific.sql; then
-             echo "Linting passed (no issues found)"
-           else
-             echo "Linting found issues (expected for test files)"
-           fi
+                       echo "Testing linting (expected to have linting issues after rendering)..."
+            if sqlfluff lint --dialect snowflake ../shared/V1.0.1__env_specific.sql; then
+              echo "Linting passed (no issues found)"
+            else
+              echo "Linting found issues (expected for test files)"
+            fi
 
       - name: Run pytest
         run: |
@@ -191,9 +197,12 @@ jobs:
 
               # Test SQLFluff render
               try:
+                  # Run from the examples directory to ensure proper config loading
+                  # Use relative path from examples directory
+                  relative_path = sql_file.relative_to(Path("examples"))
                   result = subprocess.run([
-                      'sqlfluff', 'render', str(sql_file), '--dialect', 'snowflake'
-                  ], capture_output=True, text=True, timeout=30)
+                      'sqlfluff', 'render', str(relative_path), '--dialect', 'snowflake'
+                  ], capture_output=True, text=True, timeout=30, cwd='examples')
                   sqlfluff_success = result.returncode == 0
                   print(f"  SQLFluff: {'PASS' if sqlfluff_success else 'FAIL'}")
                   if not sqlfluff_success:
