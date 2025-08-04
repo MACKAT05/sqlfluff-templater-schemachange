@@ -83,11 +83,8 @@ jobs:
            echo "Testing render functionality for basic test..."
            sqlfluff render --dialect snowflake test.sql
                        echo "Testing linting (expected to have linting issues after rendering)..."
-            if sqlfluff lint --dialect snowflake test.sql; then
-              echo "Linting passed (no issues found)"
-            else
-              echo "Linting found issues (expected for test files)"
-            fi
+            chmod +x tests/ci/lint_wrapper.sh
+            ./tests/ci/lint_wrapper.sh lint --dialect snowflake test.sql
 
            # Test advanced functionality
            cd ../advanced
@@ -100,22 +97,14 @@ jobs:
              fi
            done
                        echo "Testing linting (expected to have linting issues after rendering)..."
-            if sqlfluff lint --dialect snowflake migrations/; then
-              echo "Linting passed (no issues found)"
-            else
-              echo "Linting found issues (expected for test files)"
-            fi
+            ./tests/ci/lint_wrapper.sh lint --dialect snowflake migrations/
 
            # Test environment-specific configs
            cd ../environments/dev
            echo "Testing render functionality for environment test..."
            sqlfluff render --dialect snowflake ../shared/V1.0.1__env_specific.sql
                        echo "Testing linting (expected to have linting issues after rendering)..."
-            if sqlfluff lint --dialect snowflake ../shared/V1.0.1__env_specific.sql; then
-              echo "Linting passed (no issues found)"
-            else
-              echo "Linting found issues (expected for test files)"
-            fi
+            ./tests/ci/lint_wrapper.sh lint --dialect snowflake ../shared/V1.0.1__env_specific.sql
 
       - name: Run pytest
         run: |
@@ -165,11 +154,7 @@ jobs:
 
             # Test linting (expected to have linting issues after rendering)
             echo "Testing linting (expected to have linting issues after rendering)..."
-            if sqlfluff lint --dialect snowflake examples/migrations/; then
-              echo "Linting passed (no issues found)"
-            else
-              echo "Linting found issues (expected for test files)"
-            fi
+            ./tests/ci/lint_wrapper.sh lint --dialect snowflake examples/migrations/
           fi
 
       - name: Test schemachange compatibility
@@ -327,10 +312,11 @@ jobs:
 
           # Test SQLFluff linting (expected to have linting issues after rendering)
           echo "Testing linting (expected to have linting issues after rendering)..."
-          if sqlfluff lint test.sql; then
-            echo "Linting passed (no issues found)"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            powershell -ExecutionPolicy Bypass -File tests/ci/lint_wrapper.ps1 lint test.sql
           else
-            echo "Linting found issues (expected for test files)"
+            chmod +x tests/ci/lint_wrapper.sh
+            ./tests/ci/lint_wrapper.sh lint test.sql
           fi
 
       - name: Generate and test comprehensive examples
