@@ -81,7 +81,7 @@ jobs:
            # Test basic functionality - focus on render functionality
            cd temp/basic
            echo "Testing render functionality for basic test..."
-           sqlfluff render --dialect snowflake test.sql
+                       sqlfluff render --dialect snowflake --config .sqlfluff test.sql
                        echo "Testing linting (expected to have linting issues after rendering)..."
             chmod +x tests/ci/lint_wrapper.sh
             ./tests/ci/lint_wrapper.sh lint --dialect snowflake test.sql
@@ -93,7 +93,7 @@ jobs:
            for file in migrations/*.sql; do
              if [ -f "$file" ]; then
                echo "Rendering $file..."
-               sqlfluff render --dialect snowflake "$file"
+                               sqlfluff render --dialect snowflake --config .sqlfluff "$file"
              fi
            done
                        echo "Testing linting (expected to have linting issues after rendering)..."
@@ -102,7 +102,7 @@ jobs:
            # Test environment-specific configs
            cd ../environments/dev
            echo "Testing render functionality for environment test..."
-           sqlfluff render --dialect snowflake ../shared/V1.0.1__env_specific.sql
+                       sqlfluff render --dialect snowflake --config .sqlfluff ../shared/V1.0.1__env_specific.sql
                        echo "Testing linting (expected to have linting issues after rendering)..."
             ./tests/ci/lint_wrapper.sh lint --dialect snowflake ../shared/V1.0.1__env_specific.sql
 
@@ -149,7 +149,7 @@ jobs:
             # Test rendering examples (this should work)
             for file in examples/migrations/*.sql; do
               echo "Testing render for $file"
-              sqlfluff render "$file" --dialect snowflake || echo "Render failed for $file (may be expected)"
+              sqlfluff render "$file" --dialect snowflake --config examples/.sqlfluff || echo "Render failed for $file (may be expected)"
             done
 
             # Test linting (expected to have linting issues after rendering)
@@ -185,9 +185,9 @@ jobs:
                   # Run from the examples directory to ensure proper config loading
                   # Use relative path from examples directory
                   relative_path = sql_file.relative_to(Path("examples"))
-                  result = subprocess.run([
-                      'sqlfluff', 'render', str(relative_path), '--dialect', 'snowflake'
-                  ], capture_output=True, text=True, timeout=30, cwd='examples')
+                                     result = subprocess.run([
+                       'sqlfluff', 'render', str(relative_path), '--dialect', 'snowflake', '--config', '.sqlfluff'
+                   ], capture_output=True, text=True, timeout=30, cwd='examples')
                   sqlfluff_success = result.returncode == 0
                   print(f"  SQLFluff: {'PASS' if sqlfluff_success else 'FAIL'}")
                   if not sqlfluff_success:
@@ -308,7 +308,7 @@ jobs:
 
           # Test SQLFluff render functionality (this should work)
           echo "Testing render functionality..."
-          sqlfluff render test.sql
+                     sqlfluff render test.sql --config .sqlfluff
 
           # Test SQLFluff linting (expected to have linting issues after rendering)
           echo "Testing linting (expected to have linting issues after rendering)..."
