@@ -169,9 +169,9 @@ jobs:
                   # Run from the examples directory to ensure proper config loading
                   # Use relative path from examples directory
                   relative_path = sql_file.relative_to(Path("examples"))
-                                     result = subprocess.run([
-                       'sqlfluff', 'render', str(relative_path), '--dialect', 'snowflake', '--config', '.sqlfluff'
-                   ], capture_output=True, text=True, timeout=30, cwd='examples')
+                  result = subprocess.run([
+                      'sqlfluff', 'render', str(relative_path), '--dialect', 'snowflake', '--config', '.sqlfluff'
+                  ], capture_output=True, text=True, timeout=30, cwd='examples')
                   sqlfluff_success = result.returncode == 0
                   print(f"  SQLFluff: {'PASS' if sqlfluff_success else 'FAIL'}")
                   if not sqlfluff_success:
