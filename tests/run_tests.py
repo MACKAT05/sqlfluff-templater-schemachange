@@ -13,11 +13,11 @@ def run_test(test_name, test_script):
             ["python", test_script], capture_output=True, text=True, check=True
         )
         print(f"{test_name} passed")
-        print(result)
+        if result.stdout.strip():
+            print(f"  Output: {result.stdout.strip()}")
         return True
     except subprocess.CalledProcessError as e:
         print(f"{test_name} failed")
-        print(result)
         print(f"Error: {e.stderr}")
         return False
 
@@ -28,10 +28,10 @@ def main():
     print()
 
     tests = [
-        ("Basic functionality", "test_basic.py"),
-        ("Modules support", "test_modules.py"),
-        ("Environment variables", "test_env_vars.py"),
-        ("Conditional logic", "test_conditional.py"),
+        ("Basic functionality", "tests/test_basic.py"),
+        ("Modules support", "tests/test_modules.py"),
+        ("Environment variables", "tests/test_env_vars.py"),
+        ("Conditional logic", "tests/test_conditional.py"),
     ]
 
     passed = 0

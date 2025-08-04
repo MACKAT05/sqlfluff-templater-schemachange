@@ -72,32 +72,27 @@ jobs:
           pip install -e .
           pip install -r requirements.txt
 
-      - name: Generate test files
-        run: |
-          python test_generator.py
-
       - name: Test SQLFluff templater functionality
         run: |
-           # Test basic functionality - focus on render functionality
-           cd temp/basic
-           echo "Testing render functionality for basic test..."
-           sqlfluff test.sql
+           # Test basic functionality
+           cd tests/basic
+           echo "Testing basic functionality..."
+           sqlfluff render --config .sqlfluff test.sql
 
-           # Test advanced functionality
-           cd ../advanced
-           echo "Testing render functionality for advanced test..."
-           # Render each SQL file in the migrations directory
-           for file in migrations/*.sql; do
-             if [ -f "$file" ]; then
-               echo "Rendering $file..."
-               sqlfluff render "$file"
-             fi
-           done
+           # Test modules support
+           cd ../modules
+           echo "Testing modules support..."
+           sqlfluff render --config .sqlfluff test.sql
 
-           # Test environment-specific configs
-           cd ../environments/dev
-           echo "Testing render functionality for environment test..."
-           sqlfluff render  ../shared/V1.0.1__env_specific.sql
+           # Test environment variables
+           cd ../env_vars
+           echo "Testing environment variables..."
+           sqlfluff render --config .sqlfluff test.sql
+
+           # Test conditional logic
+           cd ../conditional
+           echo "Testing conditional logic..."
+           sqlfluff render --config .sqlfluff test.sql
 
       - name: Run pytest
         run: |
@@ -131,9 +126,9 @@ jobs:
           pip install sqlfluff
           pip install schemachange>=3.0.0
 
-      - name: Generate test files
+      - name: Run static tests
         run: |
-          python test_generator.py
+          python tests/run_tests.py
 
       - name: Test SQLFluff on examples
         run: |
@@ -299,8 +294,7 @@ jobs:
            echo "Testing render functionality..."
            sqlfluff render test.sql --config .sqlfluff
 
-      - name: Generate and test comprehensive examples
+      - name: Run static tests
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.9'
         run: |
-          python test_generator.py
-          python test_scenario_runner.py
+          python tests/run_tests.py
