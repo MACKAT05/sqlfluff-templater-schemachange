@@ -7,7 +7,6 @@ extending SQLFluff's JinjaTemplater (no schemachange dependency required):
 - Supports schemachange-style macro loading from modules folder
 """
 
-import json
 import logging
 import os
 from pathlib import Path
@@ -38,9 +37,6 @@ class SchemachangeTemplater(JinjaTemplater):
         return super().config_pairs() + [
             ("config_folder", "."),
             ("config_file", "schemachange-config.yml"),
-            ("root_folder", "."),
-            ("modules_folder", "."),
-            ("vars", {}),
         ]
 
     def _load_schemachange_config(
@@ -85,29 +81,6 @@ class SchemachangeTemplater(JinjaTemplater):
             if isinstance(schema_vars, dict):
                 context.update(schema_vars)
 
-        # Add templater-specific vars from SQLFluff config
-        templater_config: Dict[str, Any] = {}
-        if config:
-            try:
-                templater_config = config.get_section(("templater", self.name)) or {}
-            except Exception as e:
-                logger.debug(f"Could not get templater config for context: {e}")
-
-        if "vars" in templater_config:
-            template_vars = templater_config["vars"]
-            if isinstance(template_vars, dict):
-                context.update(template_vars)
-            elif isinstance(template_vars, str):
-                # Handle string representation of JSON
-                try:
-                    parsed_vars = json.loads(template_vars)
-                    if isinstance(parsed_vars, dict):
-                        context.update(parsed_vars)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Could not parse vars as JSON: {e}")
-            else:
-                logger.warning(f"Unexpected vars type: {type(template_vars)}")
-
         logger.debug(f"Built context with {len(context)} variables")
         return context
 
@@ -136,29 +109,17 @@ class SchemachangeTemplater(JinjaTemplater):
         schemachange_config = self._load_schemachange_config(config_folder, config_file)
 
         # Set up macro loading from modules folder
-        modules_folder = templater_config.get(
-            "modules_folder"
-        ) or schemachange_config.get("modules_folder")
-        if modules_folder and Path(modules_folder).exists():
-            # Set up proper FileSystemLoader for templates
-            search_paths = [".", modules_folder]  # Current directory and modules folder
+        modules_folder = schemachange_config.get("modules-folder")
+        search_paths = ["."]  # Always include current directory
 
-            current_loader = env.loader
-            if hasattr(current_loader, "searchpath"):
-                # If we already have a filesystem loader, add to its search path
-                for path in search_paths:
-                    if path not in current_loader.searchpath:
-                        current_loader.searchpath.append(path)
-            else:
-                # Create a new FileSystemLoader
-                env.loader = FileSystemLoader(search_paths)
+        if modules_folder:
+            # Resolve modules folder relative to config folder
+            modules_path = Path(config_folder) / modules_folder
+            if modules_path.exists():
+                search_paths.append(str(modules_path))
 
-            logger.debug(f"Added modules folder to Jinja loader: {modules_folder}")
-        else:
-            # Even if no modules folder, ensure we have a basic loader
-            if not env.loader or not hasattr(env.loader, "searchpath"):
-                env.loader = FileSystemLoader(["."])
-                logger.debug("Set up basic FileSystemLoader for current directory")
+        # Always ensure we have a FileSystemLoader with the search paths
+        env.loader = FileSystemLoader(search_paths)
 
         # Add schemachange-specific functions to Jinja environment
         # if schemachange adds more functions we may need to add a dependency.

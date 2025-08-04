@@ -13,10 +13,8 @@ max_line_length = 120
 verbose = 0
 
 [sqlfluff:templater:schemachange]
-# Point to the test config file
+# Point to the schemachange config file
 config_folder = .
-modules_folder = .\templates
-vars = {"database_name": "MY_DATABASE", "schema_name": "ANALYTICS", "table_name": "customers", "state_filter": "CA", "start_date": "2023-01-01"}
 
 [sqlfluff:indentation]
 # Use consistent indentation
