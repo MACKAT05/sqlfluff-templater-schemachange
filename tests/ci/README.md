@@ -20,28 +20,19 @@ This test script verifies that the three main CI issues have been fixed:
    - **Problem**: CI used bash syntax (`if command;then`) in PowerShell
    - **Fix**: Created platform-specific wrapper scripts for consistent linting behavior
 
-## Lint Wrapper Scripts
+## Configuration
 
-### lint_wrapper.sh (Linux/macOS)
-Shell script wrapper that handles expected linting failures gracefully.
-
-### lint_wrapper.ps1 (Windows)
-PowerShell script wrapper that handles expected linting failures gracefully.
-
-Both scripts:
-- Run sqlfluff with provided arguments
-- Capture the exit code
-- Always exit with code 0 (success) to prevent CI failures
-- Display appropriate messages for pass/fail scenarios
-
-### Usage
+The CI tests focus on render functionality only, using `--config` to specify the correct `.sqlfluff` files:
 
 ```bash
-# Linux/macOS
-./tests/ci/lint_wrapper.sh lint --dialect snowflake test.sql
+# Basic test
+sqlfluff render --dialect snowflake --config .sqlfluff test.sql
 
-# Windows
-powershell -ExecutionPolicy Bypass -File tests/ci/lint_wrapper.ps1 lint --dialect snowflake test.sql
+# Advanced test with modules
+sqlfluff render --dialect snowflake --config .sqlfluff migrations/*.sql
+
+# Examples test
+sqlfluff render --dialect snowflake --config examples/.sqlfluff examples/migrations/*.sql
 ```
 
 ### Test Coverage

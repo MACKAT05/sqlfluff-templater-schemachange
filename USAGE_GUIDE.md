@@ -29,7 +29,7 @@ dialect = snowflake
 
 [sqlfluff:templater:schemachange]
 config_folder = .
-modules_folder = modules
+modules_folder = .\templates
 ```
 
 Create a `schemachange-config.yml` file:
