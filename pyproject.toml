@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqlfluff-templater-schemachange"
-version = "0.1.0"
-description = "A standalone SQLFluff templater providing schemachange-compatible Jinja templating without schemachange dependency"
+version = "0.1.1"
+description = "A SQLFluff templater compatible with schemachange, supporting macros, env_var, and config loading."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
