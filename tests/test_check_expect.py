@@ -43,6 +43,10 @@ def run_check_expect_tests():
             )
         # Compare output
         diff_cmd = ["diff", "-u", str(expect_file), str(out_file)]
+        if result.returncode != 0:
+            print(f"❌ Error running sqlfluff render in {test_dir}: {result.stderr}")
+            failed = True
+            continue
         diff_result = subprocess.run(
             diff_cmd, cwd=test_dir, capture_output=True, text=True
         )
