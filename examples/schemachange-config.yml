@@ -26,11 +26,12 @@ dry-run: false
 # Template variables
 vars:
   # Environment settings
+  # note: these variables are not available in the jinja context that evaluates this file
   environment: '{{ env_var("ENVIRONMENT", "dev") }}'
   region: 'us-west-2'
 
   # Database configuration
-  database_name: 'ANALYTICS_{{ environment | upper }}'
+  database_name: 'ANALYTICS_{{ env_var("ENVIRONMENT", "dev") }}'
   schema_name: 'CORE'
 
   # Table naming conventions
@@ -41,8 +42,8 @@ vars:
   # Data sources configuration
   sources:
     raw_database: 'RAW_DATA'
-    staging_database: 'STAGING_{{ environment | upper }}'
-    analytics_database: 'ANALYTICS_{{ environment | upper }}'
+    staging_database: 'STAGING_{{ env_var("ENVIRONMENT", "dev") }}'
+    analytics_database: 'ANALYTICS_{{ env_var("ENVIRONMENT", "dev") }}'
 
     # External stages
     s3_stage: 'S3_DATA_STAGE'
@@ -56,27 +57,27 @@ vars:
 
   # Date/time settings
   default_timezone: 'UTC'
-  fiscal_year_start: '04-01'  # April 1st
+  fiscal_year_start: '04-01' # April 1st
 
   # Feature flags
   features:
-    enable_data_masking: '{{ env_var("ENABLE_DATA_MASKING", "false") | bool }}'
+    enable_data_masking: '{{ env_var("ENABLE_DATA_MASKING", "false") }}'
     enable_column_encryption: true
-    enable_row_level_security: '{{ environment == "prod" }}'
+    enable_row_level_security: '{{ env_var("ENVIRONMENT", "dev") == "prod" }}'
 
   # Security and compliance
   data_classification:
     pii_retention_days: 90
     sensitive_data_tags:
-      - 'PII'
-      - 'SENSITIVE'
-      - 'CONFIDENTIAL'
+    - 'PII'
+    - 'SENSITIVE'
+    - 'CONFIDENTIAL'
 
   # Performance tuning
   performance:
     clustering_keys:
-      events: ['event_date', 'user_id']
-      transactions: ['transaction_date', 'account_id']
+      events: [ 'event_date', 'user_id' ]
+      transactions: [ 'transaction_date', 'account_id' ]
     warehouse_sizes:
       etl: 'LARGE'
       analytics: 'MEDIUM'

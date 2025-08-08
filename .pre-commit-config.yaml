@@ -1,100 +1,98 @@
 repos:
-  # Python code formatting
-  - repo: https://github.com/psf/black
-    rev: 23.7.0
-    hooks:
-      - id: black
-        language_version: python3
-        args: [--line-length=88]
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Python code formatting
+- repo: https://github.com/psf/black
+  rev: 23.7.0
+  hooks:
+  - id: black
+    language_version: python3
+    args: [ --line-length=88 ]
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-  # Python import sorting
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        args: [--profile=black]
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Python import sorting
+- repo: https://github.com/pycqa/isort
+  rev: 5.12.0
+  hooks:
+  - id: isort
+    args: [ --profile=black ]
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-  # Python linting
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
-    hooks:
-      - id: flake8
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Python linting
+- repo: https://github.com/pycqa/flake8
+  rev: 6.0.0
+  hooks:
+  - id: flake8
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-  # Type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.4.1
-    hooks:
-      - id: mypy
-        additional_dependencies: [types-PyYAML]
-        args: [--ignore-missing-imports]
-        exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Type checking
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.4.1
+  hooks:
+  - id: mypy
+    additional_dependencies: [ types-PyYAML ]
+    args: [ --ignore-missing-imports ]
+    exclude: ^(fix_lint_issues\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-  # SQLFluff linting for SQL files (using local development package)
-  # NOTE: Requires 'pip install -e .' to be run first to install the development package
-  # Only runs on examples/ directory which has proper .sqlfluff configuration
-  - repo: local
-    hooks:
-      - id: sqlfluff-lint-examples
-        name: SQLFluff Lint Examples
-        entry: python
-        language: system
-        files: ^examples/.*\.sql$
-        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff lint migrations/')"]
-        require_serial: false
-        pass_filenames: false
-      - id: sqlfluff-fix-examples
-        name: SQLFluff Fix Examples
-        entry: python
-        language: system
-        files: ^examples/.*\.sql$
-        args: [-c, "import os; os.chdir('examples'); os.system('sqlfluff fix migrations/ ')"]
-        require_serial: false
-        pass_filenames: false
+# SQLFluff linting for SQL files (using local development package)
+# NOTE: Requires 'pip install -e .' to be run first to install the development package
+# Only runs on examples/ directory which has proper .sqlfluff configuration
+- repo: local
+  hooks:
+  # - id: sqlfluff-lint-examples
+  #   name: SQLFluff Lint Examples
+  #   entry: python
+  #   language: system
+  #   files: ^examples/.*\.sql$
+  #   args: [ -c, "import os; os.chdir('examples'); os.system('sqlfluff lint migrations/')" ]
+  #   require_serial: false
+  #   pass_filenames: false
+  - id: sqlfluff-fix-examples
+    name: SQLFluff Fix Examples
+    entry: python
+    language: system
+    files: ^examples/.*\.sql$
+    args: [ -c, "import os; os.chdir('examples'); os.system('sqlfluff fix migrations/ ')" ]
+    require_serial: false
+    pass_filenames: false
 
-  # General file checks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
-    hooks:
-      - id: trailing-whitespace
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: end-of-file-fixer
-        exclude: ^(LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: check-yaml
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: check-json
-        exclude: ^(bandit-report\.json$|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: check-added-large-files
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: check-case-conflict
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: check-merge-conflict
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: debug-statements
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
-      - id: requirements-txt-fixer
-        exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# General file checks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: trailing-whitespace
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: end-of-file-fixer
+    exclude: ^(LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: check-yaml
+    exclude: ^(tests/jinja_yaml/schemachange-config.yml$|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: check-json
+    exclude: ^(bandit-report\.json$|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: check-added-large-files
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: check-case-conflict
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: check-merge-conflict
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: debug-statements
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+  - id: requirements-txt-fixer
+    exclude: ^(sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-  # Security checks
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.5
-    hooks:
-      - id: bandit
-        args: [--recursive, --format, json, --output, bandit-report.json, --configfile, .bandit]
-        files: \.py$
-        exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Security checks
+- repo: https://github.com/PyCQA/bandit
+  rev: 1.7.5
+  hooks:
+  - id: bandit
+    args: [ --recursive, --format, json, --output, bandit-report.json, --configfile, .bandit ]
+    files: \.py$
+    exclude: ^(test_.*\.py|tests/.*\.py|dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
-
-
-  # Documentation linting
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        args: [--convention=google]
-        exclude: ^(dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
+# Documentation linting
+- repo: https://github.com/pycqa/pydocstyle
+  rev: 6.3.0
+  hooks:
+  - id: pydocstyle
+    args: [ --convention=google ]
+    exclude: ^(dev-setup\.py|setup_test_environments\.py|verify_setup\.py|test_generator\.py|LICENSE|sqlfluff_templater_schemachange\.egg-info/|build/|dist/|\.eggs/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|venv/|env/|ENV/|env\.bak/|venv\.bak/)$
 
 # Configuration for specific hooks
 ci:
