@@ -91,7 +91,7 @@ jobs:
            # Test environment variablesin scripts
            cd ../env_vars
            if [ -f env.sh ]; then source env.sh; fi
-           echo "Testing environment variabledis..."
+           echo "Testing environment variables..."
            sqlfluff render --config .sqlfluff test.sql > test.out
            diff test.out test.expect || echo "Output differs from expected"
 

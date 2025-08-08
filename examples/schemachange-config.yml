@@ -26,7 +26,7 @@ dry-run: false
 # Template variables
 vars:
   # Environment settings
-  # note: these variables are not availible in the jinja context that evaluates this file
+  # note: these variables are not available in the jinja context that evaluates this file
   environment: '{{ env_var("ENVIRONMENT", "dev") }}'
   region: 'us-west-2'
 
@@ -63,7 +63,7 @@ vars:
   features:
     enable_data_masking: '{{ env_var("ENABLE_DATA_MASKING", "false") }}'
     enable_column_encryption: true
-    enable_row_level_security: '{{ env_var("ENVIRONMENT", "dev")== "prod" }}'
+    enable_row_level_security: '{{ env_var("ENVIRONMENT", "dev") == "prod" }}'
 
   # Security and compliance
   data_classification:
