@@ -76,23 +76,39 @@ jobs:
         run: |
            # Test basic functionality
            cd tests/basic
+           if [ -f env.sh ]; then source env.sh; fi
            echo "Testing basic functionality..."
-           sqlfluff render --config .sqlfluff test.sql
+           sqlfluff render --config .sqlfluff test.sql > test.out
+           diff test.out test.expect || echo "Output differs from expected"
 
            # Test modules support
            cd ../modules
+           if [ -f env.sh ]; then source env.sh; fi
            echo "Testing modules support..."
-           sqlfluff render --config .sqlfluff test.sql
+           sqlfluff render --config .sqlfluff test.sql > test.out
+           diff test.out test.expect || echo "Output differs from expected"
 
-           # Test environment variables
+           # Test environment variablesin scripts
            cd ../env_vars
-           echo "Testing environment variables..."
-           sqlfluff render --config .sqlfluff test.sql
+           if [ -f env.sh ]; then source env.sh; fi
+           echo "Testing environment variabledis..."
+           sqlfluff render --config .sqlfluff test.sql > test.out
+           diff test.out test.expect || echo "Output differs from expected"
 
            # Test conditional logic
            cd ../conditional
+           if [ -f env.sh ]; then source env.sh; fi
            echo "Testing conditional logic..."
-           sqlfluff render --config .sqlfluff test.sql
+           sqlfluff render --config .sqlfluff test.sql > test.out
+           diff test.out test.expect || echo "Output differs from expected"
+
+           # Test Jinja YAML support
+            cd ../jinja_yaml
+            if [ -f env.sh ]; then source env.sh; fi
+            export YAML_VAR="critical_value"
+            echo "Testing Jinja YAML support..."
+           sqlfluff render --config .sqlfluff test.sql > test.out
+           diff test.out test.expect || echo "Output differs from expected"
 
       - name: Run pytest
         run: |
@@ -105,7 +121,6 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
-
   test-cross-functionality:
     name: Cross-functionality Tests
     runs-on: ubuntu-latest

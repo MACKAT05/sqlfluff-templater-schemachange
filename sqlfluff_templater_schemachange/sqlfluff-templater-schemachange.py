@@ -10,10 +10,10 @@ extending SQLFluff's JinjaTemplater (no schemachange dependency required):
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
-from jinja2 import FileSystemLoader
+from jinja2 import Environment, FileSystemLoader
 from sqlfluff.core.templaters.jinja import JinjaTemplater
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class SchemachangeTemplater(JinjaTemplater):
     name = "schemachange"
 
     def config_pairs(self):
-        """Return configuration options for this templater."""
+        """Return configuration options and defaults for this templater."""
         return super().config_pairs() + [
             ("config_folder", "."),
             ("config_file", "schemachange-config.yml"),
@@ -51,8 +51,14 @@ class SchemachangeTemplater(JinjaTemplater):
 
         try:
             with open(config_path, "r") as f:
-                schema_config = yaml.safe_load(f) or {}
-            logger.debug(f"Loaded schemachange config from {config_path}")
+                raw_text = f.read()
+            jinja_env = Environment()
+            jinja_env.globals["env_var"] = SchemachangeTemplater._get_env_var
+            rendered_text = jinja_env.from_string(raw_text).render()
+            schema_config = yaml.safe_load(rendered_text) or {}
+            logger.debug(
+                f"Loaded schemachange config from {config_path} (Jinja rendered)"
+            )
             return schema_config
         except Exception as e:
             logger.warning(
@@ -84,9 +90,20 @@ class SchemachangeTemplater(JinjaTemplater):
         logger.debug(f"Built context with {len(context)} variables")
         return context
 
-    def _get_env_var(self, var_name: str, default_value: str = "") -> str:
+    @staticmethod
+    def _get_env_var(env_var: str, default: Optional[str] = None) -> str:
         """Schemachange-compatible env_var function."""
-        return os.environ.get(var_name, default_value)
+        result = default
+        if env_var in os.environ:
+            result = os.environ[env_var]
+
+        if result is None:
+            raise ValueError(
+                f"Could not find environmental variable {env_var} "
+                + "and no default value was provided"
+            )
+
+        return result
 
     def _get_jinja_env(self, config=None, **kwargs):
         """Override to add schemachange-specific Jinja environment setup."""
@@ -123,7 +140,7 @@ class SchemachangeTemplater(JinjaTemplater):
 
         # Add schemachange-specific functions to Jinja environment
         # if schemachange adds more functions we may need to add a dependency.
-        env.globals["env_var"] = self._get_env_var
+        env.globals["env_var"] = SchemachangeTemplater._get_env_var
 
         # Add context variables to environment globals
         context = self._get_context_from_config(config, schemachange_config)

@@ -1,0 +1,4 @@
+config-version: 1
+vars:
+  database_name: 'TEST_DATABASE'
+  schema_name: 'PUBLIC'

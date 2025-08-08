@@ -1,0 +1,7 @@
+config-version: 1
+{% if env_var("YAML_VAR") == "critical_value" %}
+vars:
+  database_name: DATABASE
+  warehouse:  WAREHOUSE
+  environment: ENVIRONMENT
+{% endif %}

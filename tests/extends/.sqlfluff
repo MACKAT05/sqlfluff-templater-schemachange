@@ -1,0 +1,6 @@
+[sqlfluff]
+templater = jinja
+dialect = snowflake
+
+[sqlfluff:templater:jinja]
+templates_dirs = .
